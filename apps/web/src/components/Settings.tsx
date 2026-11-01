@@ -1,0 +1,222 @@
+import React, { useEffect, useState } from "react";
+import { api } from "../api";
+import type { Bootstrap, ModelPreset, PresetModel, TtsProvider } from "../types";
+
+export function Settings({ boot, refresh }: { boot: Bootstrap; refresh: () => void }): JSX.Element {
+  return (
+    <div className="page">
+      <ProviderSection boot={boot} refresh={refresh} />
+      <CredentialSection boot={boot} refresh={refresh} />
+      <h2>스킬 라이브러리</h2>
+      <p className="muted">
+        SKILL.md 폴더 기반 스킬입니다. <code>data/skills/&lt;이름&gt;/SKILL.md</code>에 넣으면 봇이 <code>skills.read</code>로 읽습니다.
+      </p>
+      {boot.skills.map((s) => (
+        <div key={s.name} className="card row">
+          <div>
+            <code>{s.name}</code>
+            <div className="muted small">{s.description}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProviderSection({ boot, refresh }: { boot: Bootstrap; refresh: () => void }): JSX.Element {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<"openai-compatible" | "anthropic" | "mock">("openai-compatible");
+  const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("gpt-4o-mini");
+  const [isDefault, setIsDefault] = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const [presets, setPresets] = useState<ModelPreset[]>([]);
+  const [presetId, setPresetId] = useState("custom");
+  const [presetModels, setPresetModels] = useState<PresetModel[]>([]);
+  const [modelsNote, setModelsNote] = useState<string | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  useEffect(() => {
+    api.listPresets().then(setPresets).catch(() => setPresets([]));
+  }, []);
+
+  const preset = presets.find((p) => p.id === presetId);
+
+  const applyPreset = (id: string): void => {
+    setPresetId(id);
+    setPresetModels([]);
+    setModelsNote(null);
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setKind(p.kind);
+    if (p.baseUrl) setBaseUrl(p.baseUrl);
+    if (!name.trim()) setName(id);
+    if (p.requiresKey === false) setApiKey("");
+  };
+
+  const loadModels = async (): Promise<void> => {
+    if (!preset?.discover) return;
+    setLoadingModels(true);
+    setModelsNote(null);
+    try {
+      const r = await api.listPresetModels(preset.id);
+      if (r.ok && r.models && r.models.length > 0) {
+        setPresetModels(r.models);
+        setModel(r.models[0].name);
+      } else {
+        setModelsNote(r.ok ? "설치된 모델이 없습니다. 먼저 모델을 pull/install하세요." : `연결 실패: ${r.error ?? "알 수 없음"}`);
+      }
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  return (
+    <>
+      <h2>모델 자격증명 (BYO)</h2>
+      <p className="muted">OpenAI 호환(Groq, OpenRouter, Ollama 등) 또는 Anthropic 키를 직접 넣습니다. 키는 AES-256-GCM으로 암호화 저장되며 다시 표시되지 않습니다.</p>
+      <div className="card">
+        <div className="form-grid">
+          <label>프리셋</label>
+          <div className="row">
+            <select value={presetId} onChange={(e) => applyPreset(e.target.value)}>
+              <option value="custom">직접 입력</option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {preset?.discover && (
+              <button className="btn" disabled={loadingModels} onClick={loadModels}>
+                {loadingModels ? "불러오는 중…" : "모델 목록 불러오기"}
+              </button>
+            )}
+          </div>
+          {preset && <div className="muted small" style={{ gridColumn: "2" }}>{preset.note}</div>}
+          <label>이름</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="openai-main" />
+          <label>종류</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+            <option value="openai-compatible">OpenAI 호환</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="mock">mock (키 불필요)</option>
+          </select>
+          <label>Base URL</label>
+          <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} disabled={kind === "mock"} />
+          <label>API 키</label>
+          <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={preset && !preset.requiresKey ? "불필요 (로컬)" : "sk-…"} disabled={kind === "mock" || (preset !== undefined && !preset.requiresKey)} />
+          <label>모델</label>
+          {presetModels.length > 0 ? (
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              {presetModels.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}{m.capabilities?.includes("tools") ? " · tools" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input value={model} onChange={(e) => setModel(e.target.value)} />
+          )}
+          {modelsNote && <div className="muted small" style={{ gridColumn: "2" }}>{modelsNote}</div>}
+          <label>기본으로 사용</label>
+          <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
+        </div>
+        <button
+          className="btn primary"
+          disabled={!name.trim() || !model.trim()}
+          onClick={async () => {
+            await api.createProvider({ name, kind, baseUrl: kind === "mock" ? undefined : baseUrl, apiKey: apiKey || undefined, model, isDefault });
+            setName("");
+            setApiKey("");
+            setPresetId("custom");
+            setPresetModels([]);
+            refresh();
+          }}
+        >
+          추가
+        </button>
+      </div>
+
+      {boot.providers.map((p) => (
+        <div key={p.id} className="card row">
+          <div>
+            <strong>{p.name}</strong> <span className="badge">{p.kind}</span> <code>{p.model}</code>{" "}
+            {p.is_default === 1 && <span className="badge ok">기본 ★</span>}
+            {p.hasKey && <span className="badge info">키 저장됨</span>}
+            <div className="muted small">{p.base_url ?? "—"}</div>
+            {testResults[p.id] && <div className="small test-result">{testResults[p.id]}</div>}
+          </div>
+          <div className="row">
+            <button
+              className="btn"
+              onClick={async () => {
+                const r = await api.testProvider(p.id);
+                setTestResults((s) => ({ ...s, [p.id]: r.ok ? `응답: ${r.reply}` : `실패: ${r.error}` }));
+              }}
+            >
+              테스트
+            </button>
+            {p.is_default !== 1 && (
+              <button className="btn" onClick={async () => { await api.patchProvider(p.id, { isDefault: true }); refresh(); }}>
+                기본으로
+              </button>
+            )}
+            <button className="btn danger" onClick={async () => { await api.deleteProvider(p.id); refresh(); }}>
+              삭제
+            </button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function CredentialSection({ boot, refresh }: { boot: Bootstrap; refresh: () => void }): JSX.Element {
+  const [values, setValues] = useState<Record<string, string>>({});
+  return (
+    <>
+      <h2>음성 & 외부 서비스 키</h2>
+      <p className="muted">
+        ElevenLabs/OpenAI/Cartesia/Fish 키로 음성 합성(TTS)과 받아쓰기(Whisper)를, Composio/Pipedream 키로 앱 연동을 켭니다. 브라우저 음성은 키가 없어도 동작합니다.
+      </p>
+      {boot.credentials.map((c) => (
+        <div key={c.key} className="card row">
+          <div>
+            <code>{c.key}</code> {c.present ? <span className="badge ok">저장됨</span> : <span className="badge off">없음</span>}
+          </div>
+          <div className="row">
+            <input
+              type="password"
+              placeholder="새 값"
+              value={values[c.key] ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, [c.key]: e.target.value }))}
+            />
+            <button
+              className="btn primary"
+              disabled={!(values[c.key] ?? "").trim()}
+              onClick={async () => {
+                await api.putCredential(c.key, values[c.key]);
+                setValues((v) => ({ ...v, [c.key]: "" }));
+                refresh();
+              }}
+            >
+              저장
+            </button>
+            {c.present && (
+              <button className="btn danger" onClick={async () => { await api.putCredential(c.key, ""); refresh(); }}>
+                삭제
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      <p className="muted small">
+        음성 제공자 선택은 각 봇 만들기/편집에서 합니다 (browser / elevenlabs / openai / cartesia / fish).
+      </p>
+    </>
+  );
+}
+
+export function ttsProviderLabel(p: TtsProvider): string {
+  return { browser: "브라우저", elevenlabs: "ElevenLabs", openai: "OpenAI", cartesia: "Cartesia", fish: "Fish Audio" }[p];
+}

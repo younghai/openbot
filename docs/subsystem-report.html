@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenBot 하위 시스템 해부 — HOW · WHY</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#11151f; --panel2:#161b28; --line:#232a3a; --text:#d7dce8; --muted:#8b93a7; --accent:#6c8cff; --ok:#4ade80; --warn:#fbbf24; --chip:#1c2333; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.75 -apple-system,"Apple SD Gothic Neo","Segoe UI",sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:48px 28px 90px; }
+  h1 { font-size:29px; margin:0 0 6px; letter-spacing:-.5px; }
+  h2 { font-size:21px; margin:54px 0 14px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  h3 { font-size:15.5px; margin:20px 0 6px; color:#a5b4fc; }
+  p { margin:8px 0; } .muted { color:var(--muted); } .small { font-size:12.5px; }
+  code { background:var(--chip); border-radius:5px; padding:1px 6px; font-size:12.5px; color:#a5b4fc; font-family:ui-monospace,Menlo,monospace; }
+  .kicker { color:var(--accent); font-size:13px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
+  .hero { background:linear-gradient(135deg,#141a2a,#0e1220); border:1px solid var(--line); border-radius:14px; padding:26px 30px; margin-top:24px; }
+  .score-big { display:flex; gap:20px; flex-wrap:wrap; margin-top:14px; }
+  .score-box { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 20px; text-align:center; min-width:140px; }
+  .score-box .n { font-size:30px; font-weight:800; } .score-box .l { color:var(--muted); font-size:12px; }
+  .sub { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0; }
+  .howwhy { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:10px; }
+  @media (max-width:860px){ .howwhy{grid-template-columns:1fr;} }
+  .how { border-left:3px solid var(--accent); padding-left:12px; }
+  .why { border-left:3px solid var(--warn); padding-left:12px; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; letter-spacing:1px; color:var(--accent); }
+  .tag.why { color:var(--warn); }
+  ol.flow { margin:6px 0 0; padding-left:20px; } ol.flow li { margin:3px 0; }
+  .anchors { margin-top:10px; padding-top:8px; border-top:1px dashed var(--line); }
+  .verify { margin-top:8px; font-size:12.5px; color:var(--ok); }
+  .method { background:#12161f; border-left:3px solid var(--accent); padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; color:var(--muted); margin:14px 0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:12px 0; }
+  th,td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--panel2); color:var(--muted); font-weight:600; font-size:12px; }
+  footer { margin-top:60px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; }
+  @media print { body{background:#fff;color:#111;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<p class="kicker">Architecture Investigation · 2026-11-01</p>
+<h1>OpenBot 하위 시스템 해부 — 어떻게 동작하는가(HOW), 왜 그렇게 만들어졌는가(WHY)</h1>
+<p class="muted">poteto-mode · investigation 플레이북 — 모든 주장에 코드 닻(file:line)과 근거를 단다. WHY의 1차 원천은 <code>docs/DECISIONS.md</code>(결정 기록 13건)와 실측 사실이다.</p>
+
+<div class="hero">
+  <p style="margin:0"><b>한 줄 요약</b>: 단일 노드·로컬 우선의 봇 플랫폼으로, <b>모든 도구 실행이 하나의 게이트웨이를 통과해(승인→체크포인트→감사) 사람이 통제하는 자율 에이전트</b>를 만든다는 설계 원칙이 전 하위 시스템에 일관된다.</p>
+  <div class="score-big">
+    <div class="score-box"><div class="n">8,881</div><div class="l">전체 코드 줄 (65파일)</div></div>
+    <div class="score-box"><div class="n">6,133 / 2,295</div><div class="l">서버 / 웹</div></div>
+    <div class="score-box"><div class="n">44/44</div><div class="l">검증 매트릭스 (E2E)</div></div>
+    <div class="score-box"><div class="n">13</div><div class="l">결정 기록 (DECISIONS)</div></div>
+    <div class="score-box"><div class="n">6</div><div class="l">서버 의존성 (절제)</div></div>
+  </div>
+</div>
+
+<h2>0. 방법론과 증거 원천</h2>
+<div class="method">
+  <b>HOW</b>는 코드에서 실측(2026-11-01 심볼 라인 스캔) · <b>WHY</b>는 결정 기록(<code>docs/DECISIONS.md</code>)과 세션 중 실측 사건(사고·실패 기록)의 인용 · <b>검증</b>은 매트릭스 44체크와 라이브 E2E 기록. <b>저장소 역사(git log) 원천: 없음</b> — 이 폴더는 git 저장소가 아니며, 역사 대용으로 DECISIONS.md·README 검증 기록·세션 로그를 쓴다. 판단이 개입하면 "판단"으로 표기한다.
+</div>
+
+<h2>1. 진입 · 부팅 · 라우팅</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li>부팅 순서: 디렉터리 확보 → 스킬 시드(예제·desktop-use) → <b>고아 running 잡 복구</b>(error 처리) → 위임 와이어링 → 크론 스케줄러 → 텔레그램 게이트웨이 → 큐 킥 — <code>apps/server/src/index.ts:24</code></li>
+        <li>라우트는 도메인 8파일로 분할(bots·conversations·computers·models·sources·routines·tasks·platform/files) 후 얇은 컴포저로 마운트 — <code>routes.ts</code>(17줄)</li>
+        <li>mutation 입력은 zod 계약으로 검증(400 + issues) — 예: <code>routes/conversations.ts:14</code></li>
+        <li>예외는 <code>app.onError</code>가 로깅 후 구조화 500 반환 — <code>index.ts:21</code></li>
+        <li>WS 업그레이드는 <code>/ws</code> 단일 경로 — <code>ws.ts:7</code></li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>분할</b>: 원래 523줄 모놀리식 routes.ts가 도메인 8파일로 나뉨(2026-10-31 리팩토링 패키지) — PM툴급 확장(Task·검색·통계) 전에 갚은 구조 부채.<br>
+      · <b>onError</b>: 라우트 예외가 무로그 500으로 사라진 실측 사건(/api/bots 디버깅)이 직접 계기.<br>
+      · <b>고아 잡 복구</b>: 재시작 전 running 잡이 큐를 영구 봉쇄한 실측 사고(WS봇2 hang)의 근본 수정 — 서버 없이 살아남는 running은 없다는 불변식.<br>
+      · <b>zod</b>: 손으로 쓴 검증의 비일관성을 계약으로 대체(선언만 되고 안 쓰던 의존성을 실제로 활성화).</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>index.ts:21,24</code> · <code>routes/*.ts</code> · <code>ws.ts:7</code> · 감사: 분할 직후 매트릭스로 34/34 회귀 확인(컴퓨터 라우트 누락·zod 29k 거부를 매트릭스가 잡음)</div>
+</div>
+
+<h2>2. 에이전트 루프 — 대화의 심장</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><code>runAgent</code>: 시스템 프롬프트(페르소나+기억 회상+<b>할당 작업</b>+스킬 목록) 조립 → 최대 12회 모델↔도구 반복 — <code>loop.ts:42,155</code></li>
+        <li>매 턴 시작 시 <code>maybeCompact</code>: 24k자 초과면 오래된 70%를 요약으로 압축(도구 결과도 요약 원문에 보존) — <code>loop.ts:236</code></li>
+        <li><code>historyForProvider</code>: 저장된 행을 공급자용으로 재조립, 이미지 첨부는 <code>image_url</code> 멀티모달 파트로 — <code>loop.ts:327,363</code></li>
+        <li>기억 회상 <code>recallMemories</code>: 최신 10개가 아니라 <b>관련도 스코어링</b>(키워드 중복×3 + 시간 감쇠) — <code>loop.ts:98</code></li>
+        <li>위임: <code>bot.delegate</code>(봇 간, 깊이≤3·visited 사이클 가드)와 <code>subagent.run</code>(일회성) — <code>loop.ts</code> wireDelegation</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>12회 상한</b>: 무한 도구 루프 방지(매트릭스로 상한 동작 확인).<br>
+      · <b>압축이 문자수 기반 70%</b>: 로컬 소형 모델 시대의 단순함 우선 — 중요도 기반 선택은 3차 개선(도구 결과 보존)으로 절충.<br>
+      · <b>작업을 시스템 프롬프트에 주입</b>: 보드의 "담당 봇"이 자기 작업을 항상 보게 하여 <code>task.update</code> 자가 보고가 자연스럽게 발생(실물 관찰).<br>
+      · <b>회상 스코어링</b>: "최신 10개"는 오래된 중요 사실을 묻힘 — ReMe식 지식 우선 회상으로 개선(2026-11-01).</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>loop.ts:42,98,155,236,327,363</code> · 검증: 매트릭스 "context compaction", "peer bot delegation", "subagent spawn", 라이브 task 완료 보고 E2E</div>
+</div>
+
+<h2>3. 모델 공급자 — 스트리밍·멀티모달·사고</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li>3종: OpenAI 호환(기본) / Anthropic / <b>Mock</b> — <code>providerForRow</code> 선택 — <code>providers.ts</code></li>
+        <li>OpenAI 호환은 항상 <code>stream:true</code> → SSE 직접 파싱: content 델타 즉시 방출, <b>tool_calls 조각을 index별로 조립</b>, 비스트리밍 응답은 폴백 수용 — <code>providers.ts:57,93,134</code></li>
+        <li>thinking 모델: <code>delta.reasoning</code> 등 3개 필드명 수용, 누적 글자수만 <code>onThinking</code>으로(내용 미노출) — <code>providers.ts:159</code></li>
+        <li>프리셋: Ollama(<code>/api/tags</code> 자동 발견)·LM Studio — <code>presets.ts</code> · 기본 provider 폴백으로 봇 전체 즉시 업그레이드</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>SSE 직접 파싱</b>(DECISIONS): 로컬 모델은 느려 스트리밍이 UX 필수 — SDK 없이 조립 가능함을 구현으로 증명(실측: 델타 45개/198개).<br>
+      · <b>Mock 내장</b>(DECISIONS): 키 없이도 전체 도구 회로를 "작동 증명" — 매트릭스 대부분이 mock로 돈다.<br>
+      · <b>reasoning 내용 미노출</b>: 프라이버시(사고 과정은 글자수 진행표시만) — 관찰자 로그로 누출 0 실측.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>providers.ts:48,57,93,134,159</code> · 검증: 매트릭스 "BYO model credentials (real HTTP call)", "image attachment → vision content", 라이브 Ollama 스트리밍/생각중 24이벤트</div>
+</div>
+
+<h2>4. 도구 게이트웨이 — 통제의 단일 지점</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><code>executeTool</code> 단일 진입(정적·동적·위임 도구 모두): <b>승인 게이트 → 체크포인트 → 감사 insert → 실행 → 감사 update</b> — <code>gateway.ts:107</code></li>
+        <li>승인: 정책이 'ask'면 <code>requestApproval</code> promise로 블록(10분 만료, WS 브로드캐스트, REST 승인/거부) — <code>gateway.ts:169</code>, <code>approvals.ts:26,148</code></li>
+        <li>정책은 데이터(<code>tool_policies</code> 테이블, 행 없으면 기본 'ask') + 프리셋 3종(안전/작업장/잠금) — <code>approvals.ts:52</code></li>
+        <li>가드: 경로 탈출 <code>safeWorkspacePath</code>(<code>gateway.ts:63</code>) · 사설망 SSRF 차단 <code>assertPublicHttpUrl</code>(<code>:85</code>) · 에러 계약 <code>retryHint</code>(<code>:28</code>)</li>
+        <li>체크포인트: 승인된 terminal/fs.write 직전 워크스페이스 tar.gz 스냅샷 — <code>gateway.ts:152</code>, <code>checkpoints.ts:25,48</code></li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>단일 choke point</b>(DECISIONS, CopilotKit OpenBot 패턴): "실행 전에 결정, 실행 후에 기록" — 승인·감사를 도구마다 흩지 않는다.<br>
+      · <b>만료=거부</b>(DECISIONS): 재시작 후 대기 없는 승인은 무인 실행 허용과 같음 — 안전 방향 선택.<br>
+      · <b>기본 'ask'</b>: 알 수 없는 도구는 항상 물어보는 fail-safe (실측: memory.read 미시드가 큐 블록으로 발견된 사례가 그 증거이자 교훈).<br>
+      · <b>승인 잡 블록은 해당 봇 FIFO만</b>(DECISIONS): 사람 응답을 기다리는 동안 다른 봇은 자유.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>gateway.ts:28,63,85,107,152,169</code> · <code>approvals.ts:26,52,148</code> · 검증: 매트릭스 승인 3체크(ask→approve/deny/재시작 만료)·SSRF deny·정책 프리셋 체크</div>
+</div>
+
+<h2>5. 코어 도구 — 18종의 실행기</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><code>terminal.exec</code>: 워크스페이스 안 셸 실행, <b>실행 전 명령 가드 10패턴</b>(sudo·rm -rf /·curl|sh…) — <code>core.ts:23,36</code></li>
+        <li>fs.*/browser.fetch/desktop.screenshot — 컴퓨터 스코프 준수</li>
+        <li>메모리: <code>memory.save</code>(DB+md 동시 기록) · <code>memory.write/read</code>(<code>data/memory/&lt;봇&gt;/*.md</code> 직접 편집) — <code>core.ts:467,489</code></li>
+        <li><code>search.web</code>: 키 없는 DDG — node fetch 차단 시 시스템 curl 폴백, 도메인 dedupe — <code>core.ts:373</code></li>
+        <li><code>task.update</code>: 봇이 보드 카드를 스스로 진행/완료 보고 — <code>core.ts:422</code></li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>명령 가드</b>(QwenPaw Tool Guard 패턴): 사람 승인 "이전"의 하한선 — 승인 피로 해제(작업장 프리셋)와 함께도 절대 양보 안 함.<br>
+      · <b>md 메모리</b>(ReMe 패턴): 기억이 사람이 읽고·편집하고·검색되는 파일로 자람 — 파일 뷰·⌘K와 직결.<br>
+      · <b>curl 폴백</b>: DDG가 node(undici) 지문을 차단하는 것을 실측 → 환경 특성을 코드로 흡수.<br>
+      · <b>task.update</b>: "담당자가 실제로 일하는 보드"(PM 툴 차별점)의 실행 끝단.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>core.ts:23,36,373,422,467,489</code> · 검증: 매트릭스 "command guard", "web search tool", "markdown memory layer", "task board (bot reports done)"</div>
+</div>
+
+<h2>6. 동적 도구 · MCP — 열린 도구 생태</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li>소스 5종(MCP·OpenAPI·Composio·Pipedream·Treg)이 네임스페이스 도구(<code>mcp.&lt;src&gt;.&lt;tool&gt;</code>)를 기여 — <code>dynamic.ts:62,79,199</code></li>
+        <li>MCP 두 트랜스포트: Streamable HTTP(세션·SSE)와 <b>stdio</b>(자식프로세스 stdin/stdout 라인 JSON-RPC, 60s rpc, 재기동·서버 종료 정리) — <code>mcp.ts:19,137,139</code></li>
+        <li>카탈로그 6종 데이터(Context7·DeepWiki HTTP / filesystem·fetch·memory·sequential-thinking stdio) 원클릭 등록 — <code>tool-catalog.ts</code></li>
+        <li>OpenAPI 스펙 파싱 → 도구화 — <code>openapi.ts:27</code> · 동적 도구도 같은 승인 게이트 통과(기본 ask)</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>MCP 직접 구현</b>(DECISIONS): SDK 의존 제거, JSON-RPC+SSE로 충분함을 증명.<br>
+      · <b>stdio 추가</b>: 공식 reference 서버가 전부 npx 방식이라 HTTP만으론 "죽은 프리셋"이 됨(실측 발견) — 로컬 우선 철학과 일치.<br>
+      · <b>카탈로그도 데이터</b>: 코드 아닌 한 곳의 목록 → 커뮤니티 카탈로그로 확장 준비.<br>
+      · <b>동적 도구=기본 ask</b>: 외부 부작용을 모르는 도구는 신뢰 전까지 물어본다.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>dynamic.ts:62,79,199</code> · <code>mcp.ts:19,139</code> · <code>tool-catalog.ts</code> · 검증: 매트릭스 "remote/stdio MCP tool source", "tool source catalog"(실물 등록 filesystem 14도구)</div>
+</div>
+
+<h2>7. 대기열 · 스케줄 — 시간의 관리</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><b>봇별 FIFO</b>: enqueue → kickQueue → runJob(채널 턴은 멤버 봇 순차 팬아웃) — <code>queue.ts:11,27,37</code></li>
+        <li>루틴 스케줄러: 15초 스캔, 자체 cron 매처(Vixie DOM/DOW OR) — <code>routines.ts:10</code>, <code>cron.ts:15,56</code></li>
+        <li>동시발화 분산: 루틴 id 해시 0–30초 지터 — <code>routines.ts:26,37</code></li>
+        <li>실패 10회 자동 정지 · 재시작 고아 복구(§1)</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>자체 cron</b>(DECISIONS): cron-parser의 CJS→ESM 임포트가 런타임 실패(실측) — 의존 하나를 위해 전체가 깨지는 사고를 없앰.<br>
+      · <b>봇별 FIFO</b>: 한 봇의 승인 대기가 다른 봇을 막지 않게(§4와 짝) — 대신 같은 봇 내 순서는 엄격.<br>
+      · <b>지터</b>: 같은 분에 몰리는 크론이 로컬 모델을 동시에 때려 느려지는 것을 방지.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>queue.ts:11,27,37</code> · <code>routines.ts:10,26</code> · <code>cron.ts:15,56</code> · 검증: 매트릭스 "routine auto-fires (cron)", "queue pause/resume", "persistence across restart"</div>
+</div>
+
+<h2>8. 컴퓨터 · 격리 · 샌드박스</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><code>workspaceFor</code>: team=<code>data/computers/team-&lt;id&gt;</code>(공유) / private=<code>private-&lt;botId&gt;</code>(봇별) — <code>computers/index.ts:41,49</code></li>
+        <li>모든 파일 도구는 <code>safeWorkspacePath</code>로 루트 밖 탈출 거부 · provider 6종(local/docker/e2b/daytona/createos/boat) 중 원격은 확장점(execPath/apiUrl) — DECISIONS</li>
+        <li>네이티브 데스크톱: agent-desktop 래핑 3도구, 관찰(allow)/조작(ask) 분리, ref 검증 — <code>desktop-native.ts:80,97,141</code></li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>Team/Private</b>: 원 요구사항(공유 컴퓨터+고립 컴퓨터)의 직접 구현 — 격리는 매트릭스 "computer isolation"으로 실측.<br>
+      · <b>원격 샌드박스는 추상화만</b>(DECISIONS): 벤더 API가 제각각이라 이 머신(도커 없음)에서 검증 못 할 약속은 안 함 — 정직성 원칙.<br>
+      · <b>관찰/조작 분리</b>(P1): "보는 건 자유, 만지는 건 승인" — 승인 피로와 통제의 균형.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>computers/index.ts:41,49</code> · <code>desktop-native.ts:80,97,141</code> · 검증: "computer isolation (team vs private)", "docker provider graceful unavailability", "native desktop tools"</div>
+</div>
+
+<h2>9. 이벤트 · 채널 · 원격</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li><code>broadcast</code>: 모든 이벤트에 <code>v:1</code> 봉투 → WS 전체 클라이언트 + 내부 버스 — <code>events.ts:19</code></li>
+        <li>입구 통일: REST·WS 모두 <code>enqueueFromHttp</code>(첨부·메타 저장→잡 enqueue) — <code>chat.ts:17</code>, <code>ws.ts:30</code></li>
+        <li>텔레그램 게이트웨이: 롱폴 → 바인딩 봇 DM → 답변 push, 승인 요청 <b>인라인 승인/거부 버튼</b>(토큰 저장 시 즉시 기동) — <code>telegram.ts:48,111</code></li>
+        <li>알림 센터: 승인·작업완료·루틴 → notifications 테이블 + <code>notification.new</code></li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>단방향 브로드캐스트</b>(DECISIONS): 채널·위임·루틴 이벤트가 같은 파이프 → UI가 단순해짐(SSE per-request 기각).<br>
+      · <b>v 필드</b>: Electron·모바일·텔레그램 클라이언트가 늘기 전의 계약 준비(확장 전 부채 갚기).<br>
+      · <b>텔레그램=원격 승인</b>: 승인 API가 이미 있으니 버튼 매핑만 — dinobot/QwenPaw가 수요를 증명한 패턴.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>events.ts:19</code> · <code>chat.ts:17</code> · <code>telegram.ts:48,111</code> · 검증: 매트릭스 "telegram gateway (in/out + approval buttons)"(목업 4단계), 라이브 WS 스모크 55델타</div>
+</div>
+
+<h2>10. 보안 · 데이터 주권</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li>자격증명: AES-256-GCM 금고(<code>v1:iv:tag:data</code>), 재표시 없음 — <code>crypto.ts:9,25</code>, <code>voice.ts:13</code></li>
+        <li>서버 기본 127.0.0.1 바인딩 · 감사 로그 전 도구 전량 · 원클릭 백업(<code>VACUUM INTO</code>, 10개 유지) — <code>platform.ts</code></li>
+        <li>3중 방어: 명령 가드(정적) → 승인 큐(사람) → 체크포인트(되돌림)</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>주권이 제품 정체성</b>: 그록봇 비교 리포트의 역전 축(주권·통제·비용)을 코드로 지키는 장치들.<br>
+      · <b>체크포인트가 "승인의 실행취소 버튼"</b>: 승인은 사전 통제, 스냅샷은 사후 복구 — 세 층이 각각 다른 시점을 담당.<br>
+      · <b>키 재표시 금지</b>: 금고가 있어도 UI에서 한 번 보여주면 유출 경로가 생긴다.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>crypto.ts:9,25</code> · <code>checkpoints.ts:25,48</code> · 검증: "credential vault (encrypted at rest)", "backup (VACUUM INTO)", "checkpoints (auto snapshot + restore)"</div>
+</div>
+
+<h2>11. 웹 UI — 사람의 표면</h2>
+<div class="sub">
+  <div class="howwhy">
+    <div class="how"><span class="tag">HOW</span>
+      <ol class="flow">
+        <li>React 단일 앱: 사이드바(봇·채널·작업 보드·대시보드·승인·파일·설정) + <b>⌘K 전역 검색</b> + 종 아이콘 알림 + 첫 실행 마법사(Ollama 자동감지) — <code>App.tsx</code></li>
+        <li><code>ChatView</code>: 델타 스트리밍, 🧠 생각중 표시, 이미지 첨부(붙여넣기·미리보기), 승인 배너(마운트 시 pending 복원) — <code>ChatView.tsx:35</code></li>
+        <li>WS 재연결(2초 재시도) — <code>ws.ts:9,26</code> · ErrorBoundary로 렌더 크래시 복구</li>
+      </ol>
+    </div>
+    <div class="why"><span class="tag why">WHY</span>
+      <p class="small">· <b>직접 구현</b>(DECISIONS): 세션 중 서브에이전트 UI 위임이 실패한 실측 계기 — 통제와 속도를 모두 챙김.<br>
+      · <b>승인 배너 마운트 복원</b>: 실사용 중 발견한 결함(새로고침하면 승인 대기가 소리 없이 사라짐)의 수정 — 이벤트 전용 상태의 취약성 교훈.<br>
+      · <b>파일 뷰</b>: 메모리(md)·워크스페이스·체크포인트를 한 화면에 — "지식베이스가 사람 손에 들어오는" 순간.</p>
+    </div>
+  </div>
+  <div class="anchors small">닻: <code>App.tsx</code> · <code>ChatView.tsx:35</code> · <code>Board.tsx:15</code> · <code>Files.tsx</code> · <code>web/ws.ts:9,26</code> · 검증: 실브라우저 QA(보드·배너·첨부 붙여넣기·파일 뷰 렌더 실측)</div>
+</div>
+
+<h2>12. 요약 — 설계 원칙의 일관성</h2>
+<table>
+  <tr><th>원칙</th><th>어디서 관찰되는가</th></tr>
+  <tr><td><b>단일 통제 지점</b></td><td>executeTool(승인·감사·체크포인트) · enqueueFromHttp(모든 입구) · broadcast(모든 이벤트)</td></tr>
+  <tr><td><b>안전 방향 기본</b></td><td>미지 도구=ask · 승인 만료=거부 · 명령 가드 상시 · 고아 잡=error · 127.0.0.1 바인딩</td></tr>
+  <tr><td><b>의존 절제·직접 구현</b></td><td>서버 의존 6개 · SSE/cron/MCP 직접 구현(각각 실측 실패 or 증명이 계기)</td></tr>
+  <tr><td><b>실행으로 증명</b></td><td>매트릭스 44 E2E + mock 키리스 회로 + 실물(로컬 모델·Ollama·MCP·데스크톱) 검증 문화</td></tr>
+  <tr><td><b>데이터는 주인의 것</b></td><td>로컬 sqlite·암호화 금고·백업 버튼·메모리는 md 파일(사람이 소유)</td></tr>
+</table>
+
+<div class="method">
+  <b>가장 싼 추가 확인 제안</b> (investigation 5단계): 이 리포트의 핵심 주장 "부팅 시 고아 running 잡 복구"는 <code>curl -X POST .../api/conversations/&lt;id&gt;/messages</code>로 잡을 running 중 두고 서버를 재시작한 뒤 <code>GET /api/queue</code>에서 error 처리됨을 30초 안에 재확인할 수 있다 — 유일하게 이번 스캔에서 실행 재관찰을 안 한 최신 변경이다.
+</div>
+
+<footer>
+  OpenBot 하위 시스템 조사 리포트 · 2026-11-01 · 원천: 코드 심볼 스캔(당일) + docs/DECISIONS.md(13결정) + 매트릭스 44/44 + 세션 실측 기록 · git 역사 원천 없음(비-저장소 폴더) · HOW=사실, WHY=기록된 근거+실측 사건 인용, 판단 표기 항목 없음
+</footer>
+
+</div>
+</body>
+</html>

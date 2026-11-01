@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenBot 적용 제안 보고서 — 그록봇/Meta Muse류 오픈소스 생태계 조사</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151d; --panel2:#161b26; --border:#1e2430;
+    --text:#e6e9ef; --muted:#8b93a7; --accent:#6c8cff; --accent-soft:rgba(108,140,255,.14);
+    --success:#34d399; --danger:#f87171; --warn:#fbbf24; --info:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"SF Pro Text","Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    font-size:15px;line-height:1.65}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 28px 80px}
+  header.hero{border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:36px}
+  .eyebrow{color:var(--accent);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+  h1{font-size:27px;margin:10px 0 8px;line-height:1.35}
+  .meta{color:var(--muted);font-size:13px}
+  h2{font-size:20px;margin:52px 0 6px;padding-top:18px;border-top:1px solid var(--border)}
+  h2 .no{color:var(--accent);margin-right:8px}
+  h3{font-size:16px;margin:26px 0 8px}
+  p{margin:10px 0}
+  .lead{font-size:16.5px;color:#c7cddc}
+  .muted{color:var(--muted)}
+  .small{font-size:12.5px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{background:var(--panel2);border:1px solid var(--border);padding:1px 6px;border-radius:5px;font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0}
+  th{color:var(--muted);font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:hover td{background:rgba(255,255,255,.015)}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  .badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+  .badge.ok{color:var(--success);border-color:var(--success)}
+  .badge.warn{color:var(--warn);border-color:var(--warn)}
+  .badge.info{color:var(--info);border-color:var(--info)}
+  .badge.danger{color:var(--danger);border-color:var(--danger)}
+  .badge.accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:16px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card h4{margin:0 0 8px;font-size:15px}
+  .card .row-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+  ul{margin:8px 0;padding-left:20px}
+  li{margin:4px 0}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+  .flow .now,.flow .arrow,.flow .after{padding:6px 12px;border-radius:8px;font-size:13px}
+  .flow .now{background:var(--panel2);color:var(--muted);border:1px solid var(--border)}
+  .flow .arrow{color:var(--accent);font-weight:700}
+  .flow .after{background:var(--accent-soft);border:1px solid var(--accent)}
+
+  .note{background:var(--panel);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;font-size:13.5px}
+  .note.warn{border-left-color:var(--warn)}
+  .note.ok{border-left-color:var(--success)}
+  .tier{display:flex;align-items:center;gap:10px;margin:30px 0 4px}
+  .tier .t-badge{font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px}
+  .tier-1 .t-badge{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .tier-2 .t-badge{background:rgba(251,191,36,.12);color:var(--warn);border:1px solid var(--warn)}
+  .tier-3 .t-badge{background:rgba(139,147,167,.12);color:var(--muted);border:1px solid var(--muted)}
+
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 20px;font-size:13.5px;columns:2;column-gap:32px}
+  .toc a{color:var(--text)}
+  .toc li{break-inside:avoid}
+  footer{border-top:1px solid var(--border);margin-top:56px;padding-top:18px;color:var(--muted);font-size:12.5px}
+  @media (max-width:760px){.toc{columns:1}.wrap{padding:24px 16px 60px}}
+  @media print{
+    body{background:#fff;color:#111}
+    .wrap{max-width:none}
+    .card,.note,.toc,td,th{background:#fff!important;border-color:#ddd!important}
+    a{color:#1a41c9}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">ULW-Research Report · 2026-10-29</div>
+  <h1>OpenBot 적용 제안 보고서<br/><span class="muted" style="font-size:19px">그록봇 · Meta Muse류 개인 AI 에이전트 생태계 조사</span></h1>
+  <p class="meta">조사 대상 서비스: Grok Bot · OpenAI Dots · Claude Duet · Meta Muse · Hermes Agent · OpenClaw &nbsp;|&nbsp; 적용 대상: OpenBot v0.1 (자체호스팅 봇 플랫폼)</p>
+  <p class="meta">검증 방법: GitHub API 실측 35건 · 공식 문서 페치 8건 · 접근일 2026-10-29 · 원저널 <code>.omo/ulw-research/20261029-084417/</code></p>
+</header>
+
+<nav class="toc">
+  <ul>
+    <li><a href="#s1">1. 요약</a></li>
+    <li><a href="#s2">2. 경쟁 제품 정체와 대체재</a></li>
+    <li><a href="#s3">3. 검증된 오픈소스 지형</a></li>
+    <li><a href="#s4">4. OpenBot 현재 상태와 3대 갭</a></li>
+    <li><a href="#s5">5. 적용 제안 9건 (즉시)</a></li>
+    <li><a href="#s6">6. 적용 제안 9건 (단기)</a></li>
+    <li><a href="#s7">7. 적용 제안 9건 (중기·검토)</a></li>
+    <li><a href="#s8">8. 시너지 조합과 라이선스 주의</a></li>
+    <li><a href="#s9">9. 방법론 부록</a></li>
+    <li><a href="#s10">10. 출처</a></li>
+  </ul>
+</nav>
+
+<h2 id="s1"><span class="no">1.</span>요약</h2>
+<p class="lead">'개인 AI 팀원' 생태계는 2025~26년에 폭발적으로 성숙했다. <b>OpenClaw</b>(39.3만★)가 게이트웨이 + 20여 개 메신저 채널 + 플러그인 마켓(ClawHub)의 사실상 표준을 만들었고, <b>orca</b>(10.9만★)는 여러 에이전트를 관리하는 플릿 계층으로 부상했다. rakazo가 나열한 경쟁 제품 — Meta Muse, OpenAI Dots, Claude Duet, Hermes Agent — 은 모두 실존이 확인됐고 각각의 자체호스팅 대체재도 존재한다.</p>
+<p>우리 OpenBot은 컴퓨터 격리 · 도구 게이트+감사 · 위임/서브에이전트 · 루틴 · MCP 소스 · 스킬 등 <b>플랫폼 뼈대는 상위권과 이미 겹친다</b>. 비어 있는 것은 이 생태계가 증명한 핵심 가치 3가지다: <b>① 어디서나 만나는 채널(메신저), ② 진짜 기억(시맨틱 메모리), ③ 진짜 목소리(WebRTC 대화)</b>. 본 보고서는 이 갭을 메우는 9건의 적용 제안을 우선순위(즉시 3 / 단기 3 / 중기 3)와 함께 제시한다.</p>
+
+<h2 id="s2"><span class="no">2.</span>경쟁 제품 정체와 대체재</h2>
+<p>폐쇄형 제품 5종의 실존은 GitHub 생태계의 간접 증거(공식 플러그인 저장소, 전용 스킬 카탈로그, 하드웨어 애드온, "대체재" 선언 저장소)로 교차 확인했다.</p>
+<table>
+  <thead><tr><th>제품</th><th>정체 (확인 근거)</th><th>오픈소스 대체재 (스타·라이선스 실측)</th></tr></thead>
+  <tbody>
+    <tr><td><b>Grok Bot</b></td><td>xAI/X의 DM 에이전트</td><td><a href="https://github.com/elie222/rakazo">rakazo</a> 6.1천★ Apache · <a href="https://github.com/feder-cr/invisible_dots">invisible_dots</a> 3.2만★ MIT — "OpenAI Dots/Grok Bot 대체" 선언</td></tr>
+    <tr><td><b>OpenAI Dots</b></td><td>OpenAI 에이전트 제품</td><td>invisible_dots (상동) — 봇마다 QEMU VM + 반탐지 브라우저 제공</td></tr>
+    <tr><td><b>Claude Duet</b></td><td>Anthropic 협업 에이전트</td><td><a href="https://github.com/Anil-matcha/open-duet">open-duet</a> 6.3천★ Apache — "Claude Duet 대체: 이름 있는 AI 동료" 선언</td></tr>
+    <tr><td><b>Meta Muse</b></td><td>Meta 개인 비서 (전용 Gadget 하드웨어 · 커뮤니티 스킬 카탈로그 2,384종 · HA 브리지 존재)</td><td>직접 대체재는 미발견 — <a href="https://github.com/stablyai/orca">orca</a>가 Muse를 플릿 에이전트로 지원</td></tr>
+    <tr><td><b>Hermes Agent</b></td><td>Nous Research 에이전트 (공식 플러그인 저장소 확인)</td><td>OpenClaw · orca · AionUi가 지원</td></tr>
+  </tbody>
+</table>
+<p class="small muted">※ 'Instinct'는 이번 조사 범위(검색 도구 한도)에서 정체를 확인하지 못했다. 폐쇄형 제품의 공식 기능 페이지는 미페치 — 본 보고서는 간접 증거만 인용한다.</p>
+
+<h2 id="s3"><span class="no">3.</span>검증된 오픈소스 지형</h2>
+<p>2026-10-29 GitHub API 실측(스타·라이선스·마지막 push). 모두 당일 활동 중인 저장소다.</p>
+<table>
+  <thead><tr><th>프로젝트</th><th class="num">스타</th><th>라이선스</th><th>역할 / 차용 포인트</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://github.com/openclaw/openclaw">openclaw</a></td><td class="num">393,293</td><td><span class="badge ok">MIT</span></td><td>개인 에이전트 표준 — 게이트웨이, 20+ 메신저 채널, ClawHub 마켓, 페어링 승인</td></tr>
+    <tr><td><a href="https://github.com/n8n-io/n8n">n8n</a></td><td class="num">208,914</td><td><span class="badge warn">fair-code</span></td><td>워크플로 자동화 (라이선스 주의)</td></tr>
+    <tr><td><a href="https://github.com/ollama/ollama">ollama</a></td><td class="num">185,140</td><td><span class="badge ok">MIT</span></td><td>로컬 모델 런타임 — BYO base_url 즉시 호환</td></tr>
+    <tr><td><a href="https://github.com/open-webui/open-webui">open-webui</a></td><td class="num">157,081</td><td><span class="badge warn">커스텀</span></td><td>챗 UI (패턴 참고용)</td></tr>
+    <tr><td><a href="https://github.com/farion1231/cc-switch">cc-switch</a></td><td class="num">149,727</td><td><span class="badge ok">MIT</span></td><td>코딩 CLI 올인원 데스크톱</td></tr>
+    <tr><td><a href="https://github.com/browser-use/browser-use">browser-use</a></td><td class="num">119,394</td><td><span class="badge ok">MIT</span></td><td>에이전트 브라우저 — 과제 단위 위임, 워크플로 저장/재생</td></tr>
+    <tr><td><a href="https://github.com/stablyai/orca">orca</a></td><td class="num">109,006</td><td><span class="badge ok">MIT</span></td><td>에이전트 플릿 관리 — 모바일 동반, 병렬 워크트리, 사용량 뷰</td></tr>
+    <tr><td><a href="https://github.com/modelcontextprotocol/servers">MCP servers</a></td><td class="num">91,642</td><td><span class="badge">혼합</span></td><td>공식 MCP 서버 카탈로그</td></tr>
+    <tr><td><a href="https://github.com/lobehub/lobehub">lobehub</a></td><td class="num">83,567</td><td><span class="badge warn">커스텀</span></td><td>에이전트 허브 UI (패턴 참고용)</td></tr>
+    <tr><td><a href="https://github.com/mem0ai/mem0">mem0</a></td><td class="num">68,008</td><td><span class="badge ok">Apache-2.0</span></td><td>메모리 계층 — 하이브리드 검색(시맨틱+BM25+엔티티), OSS 자체호스팅</td></tr>
+    <tr><td><a href="https://github.com/LibreChat-AI/LibreChat">LibreChat</a></td><td class="num">46,435</td><td><span class="badge ok">MIT</span></td><td>챗 UI — Agents/MCP/Skills 탑재, 안전한 참고 대상</td></tr>
+    <tr><td><a href="https://github.com/getzep/graphiti">graphiti</a></td><td class="num">32,312</td><td><span class="badge ok">Apache-2.0</span></td><td>시간 지식그래프 — 강력하나 그래프DB 운영 부담</td></tr>
+    <tr><td><a href="https://github.com/feder-cr/invisible_dots">invisible_dots</a></td><td class="num">32,293</td><td><span class="badge ok">MIT</span></td><td>Dots/Grok Bot 대체 — 봇별 VM, 승인 수신함, 멱등 도구 실행</td></tr>
+    <tr><td><a href="https://github.com/iOfficeAI/AionUi">AionUi</a></td><td class="num">33,857</td><td><span class="badge ok">Apache-2.0</span></td><td>24/7 코워크 앱 (OpenClaw/Hermes 등 래퍼)</td></tr>
+    <tr><td><a href="https://github.com/letta-ai/letta">letta</a></td><td class="num">25,274</td><td><span class="badge ok">Apache-2.0</span></td><td>상태 저장 에이전트 — 메모리 블록/자기편집/공유 기억</td></tr>
+    <tr><td><a href="https://github.com/browserbase/stagehand">stagehand</a></td><td class="num">25,854</td><td><span class="badge ok">MIT</span></td><td>코드 우선 웹 자동화 SDK</td></tr>
+    <tr><td><a href="https://github.com/pipecat-ai/pipecat">pipecat</a></td><td class="num">16,885</td><td><span class="badge ok">BSD-2</span></td><td>음성 에이전트 프레임워크 — WebRTC/전화/VAD/Flows</td></tr>
+    <tr><td><a href="https://github.com/livekit/agents">livekit agents</a></td><td class="num">14,982</td><td><span class="badge ok">Apache-2.0</span></td><td>실시간 음성/영상 에이전트</td></tr>
+    <tr><td><a href="https://github.com/ComposioHQ/composio">Composio</a></td><td class="num">30,792</td><td><span class="badge ok">MIT</span></td><td>1000+ 툴킷 — OpenBot 이미 연동 지원</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s4"><span class="no">4.</span>OpenBot 현재 상태와 3대 갭</h2>
+<div class="cards">
+  <div class="card"><h4><span class="badge ok">보유</span> 플랫폼 뼈대</h4>
+    <ul class="small">
+      <li>영속 봇 · 대화 · 루틴(cron) · FIFO 큐</li>
+      <li>Team/Private 컴퓨터 격리 (local·docker·e2b 등 6종)</li>
+      <li>도구 게이트웨이 + 감사 로그 (SSRF 차단 실측)</li>
+      <li>peer 위임 / 서브에이전트, 공유 채널</li>
+      <li>MCP·OpenAPI·Composio·Pipedream 툴 소스</li>
+      <li>Playwright 대화형 브라우저, 스킬, 컨텍스트 압축</li>
+    </ul>
+  </div>
+  <div class="card"><h4><span class="badge danger">갭 1</span> 채널</h4>
+    <p class="small">봇이 웹 UI에서만 만날 수 있다. 메신저 게이트웨이 없음 — OpenClaw가 증명한 핵심 가치 "이미 쓰는 채널에서 만남"이 비어 있다.</p>
+  </div>
+  <div class="card"><h4><span class="badge danger">갭 2</span> 기억</h4>
+    <p class="small">메모리 검색이 SQL <code>LIKE</code>다. "커피 좋아함"을 "마실 것 취향?"이라는 다른 표현으로 회수하지 못한다.</p>
+  </div>
+  <div class="card"><h4><span class="badge danger">갭 3</span> 목소리</h4>
+    <p class="small">통화 모드가 밀기-대화(push-to-talk)다. 끼어들기가 없고 한 사이클(녹음→전사→응답→TTS)이 순차 실행된다.</p>
+  </div>
+</div>
+
+<h2 id="s5"><span class="no">5.</span>적용 제안 — 즉시 (저비용 · 고가치)</h2>
+<div class="tier tier-1"><span class="t-badge">TIER 1 · 즉시</span><span class="muted small">오늘 구현 가능, 매트릭스 검증 포함</span></div>
+
+<div class="card">
+  <h4>① browser-use를 MCP 툴 소스로 연결 <span class="badge accent">노력 小</span></h4>
+  <div class="flow"><span class="now">현재: 저수준 browser.open/click/type를 모델이 한 땀 한 땀 (호출 5~10회)</span><span class="arrow">→</span><span class="after">적용 후: "예약해줘" 과제를 browser-use 에이전트에 통째로 위임</span></div>
+  <p class="small">폼 작성·로그인 세션 유지·캡차 상황을 browser-use가 자체 처리한다. 복잡 웹 작업의 성공률·속도 상승, 메인 모델 토큰 소모 절감. 기존 <code>mcp.ts</code> 재사용이라 연결만으로 붙는다. <b>주의:</b> browser-use 자체가 LLM을 호출 — 키가 없으면 ③ Ollama와 조합해 완전 로컬로 운영.</p>
+</div>
+
+<div class="card">
+  <h4>② MCP 공식 서버 카탈로그 프리셋 <span class="badge accent">노력 小</span></h4>
+  <div class="flow"><span class="now">현재: MCP 엔드포인트 URL을 직접 찾아 입력</span><span class="arrow">→</span><span class="after">적용 후: GitHub·파일시스템·검색 등 공식 서버 목록에서 원클릭 연결</span></div>
+  <p class="small">순수 사용성 개선. 봇이 "GitHub 이슈 읽기" 같은 도구를 갖게 되는 진입 장벽이 사라진다.</p>
+</div>
+
+<div class="card">
+  <h4>③ Ollama 로컬 모델 <span class="badge accent">노력 零 · 문서만</span></h4>
+  <div class="flow"><span class="now">현재: 클라우드 키가 없어 모든 봇이 mock 응답</span><span class="arrow">→</span><span class="after">적용 후: base_url=localhost:11434/v1 지정 즉시 실제 모델로 전환</span></div>
+  <p class="small">BYO 프로바이더가 이미 호환된다(코드 0줄). 비용 0원 · 외부 전송 0 · 완전 로컬. 이 머신에서 <b>실제 모델을 쓰는 유일한 무료 경로</b>. 로컬 모델 성능은 클라우드 대비 열세이고 메모리 제약이 있다.</p>
+</div>
+
+<h2 id="s6"><span class="no">6.</span>적용 제안 — 단기 (1~2주 규모)</h2>
+<div class="tier tier-2"><span class="t-badge">TIER 2 · 단기</span><span class="muted small">게이트웨이/계층 교체 수준의 개발</span></div>
+
+<div class="card">
+  <h4>④ Telegram 채널 게이트웨이 <span class="badge warn">노력 中</span></h4>
+  <div class="flow"><span class="now">현재: 봇과 대화하려면 웹 UI를 직접 열어야 함</span><span class="arrow">→</span><span class="after">텔레그램에서 문자로 대화 + 루틴 결과가 푸시 알림으로 도착</span></div>
+  <p class="small">봇이 "브라우저 안의 웹앱"에서 "주머니 속 연락상대"로 바뀐다. long-polling이라 공인 IP·포트 없이 이 Mac에서 동작, 봇 토큰 무료. 감사·큐·루틴은 기존 체계 그대로 공유. OpenClaw식 채널 확장(WhatsApp·Slack 등 20+)의 첫 단계.</p>
+</div>
+
+<div class="card">
+  <h4>⑤ mem0 OSS로 메모리 계층 교체 <span class="badge warn">노력 中</span></h4>
+  <div class="flow"><span class="now">현재: LIKE 검색 — 단어가 다르면 기억 회수 실패</span><span class="arrow">→</span><span class="after">시맨틱+키워드+엔티티 하이브리드 — 다른 표현으로도 상기</span></div>
+  <p class="small">"아이스 아메리카노 좋아한다고 했었지"가 "마실 것 취향?" 질문에도 회수된다. 기억 누적 정리와 시간 추론(과거/현재 구분) 포함. <b>주의:</b> 임베딩 모델(OpenAI 키 또는 Ollama 임베딩) + Qdrant 벡터 DB 필요.</p>
+</div>
+
+<div class="card">
+  <h4>⑥ 도구 승인 큐 (allow/ask/deny + 수신함) <span class="badge warn">노력 中</span></h4>
+  <div class="flow"><span class="now">현재: 정책 통과한 도구는 사람 개입 없이 즉시 실행</span><span class="arrow">→</span><span class="after">위험 도구는 사람이 승인/거절할 때까지 대기 (Inbox)</span></div>
+  <p class="small">invisible_dots가 증명한 패턴. 거절 사유가 봇에게 전달된다. ④ 텔레그램·루틴과 결합하면 무인 운영 봇의 파괴적 행동을 사람이 게이트키퍼로 차단 — 기존 감사 게이트의 자연 확장이며 다중 사용자 확장 시 필수 안전장치.</p>
+</div>
+
+<h2 id="s7"><span class="no">7.</span>적용 제안 — 중기 · 검토</h2>
+<div class="tier tier-3"><span class="t-badge">TIER 3 · 중기</span><span class="muted small">인프라/키가 동반되는 구조 개선</span></div>
+<table>
+  <thead><tr><th>#</th><th>제안</th><th>현재 → 적용 후</th><th>효과 · 주의</th></tr></thead>
+  <tbody>
+    <tr><td>⑦</td><td><b>pipecat WebRTC 통화</b></td><td>밀기-대화(무전기) → 동시 음성(전화): 끼어들기·VAD·자연 턴테이킹</td><td>STT/TTS 키(또는 로컬 whisper+TTS) 필요, 전화망 연결 옵션까지 확장 가능</td></tr>
+    <tr><td>⑧</td><td><b>플릿 대시보드</b></td><td>감사 로그(무엇을 했나) → 봇별 사용량·토큰·실패율·비용 뷰 (orca 관점)</td><td>데이터가 이미 audit_log/queue_jobs에 있어 집계 뷰 추가 수준</td></tr>
+    <tr><td>⑨</td><td><b>VM 컴퓨터 프로바이더</b></td><td>local=호스트 전권 → 봇마다 QEMU VM 격리 (invisible_dots 패턴)</td><td>신뢰 불가 작업 안심 위임. Mac에선 가속 없어 느림 — 리눅스 서버 적합</td></tr>
+    <tr><td>⑨+</td><td><b>graphiti 지식그래프</b></td><td>mem0 하위호환 검토 → 시간 축 지식그래프("누가 언제 무엇이 지금은 어떻게")</td><td>mem0 먼저, 필요 시 진행이 합리적(그래프DB 운영 부담)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s8"><span class="no">8.</span>시너지 조합과 라이선스 주의</h2>
+<div class="cards">
+  <div class="card"><h4>③+① 완전 로컬 에이전트</h4><p class="small">Ollama + browser-use = 키 없이 로컬 모델이 로컬 브라우저를 조종하는 폐쇄 회로.</p></div>
+  <div class="card"><h4>④+⑥ 안전한 원격 지시</h4><p class="small">텔레그램 + 승인 큐 = 밖에서 봇에게 시키되 위험 행동은 사람 승인 후 실행.</p></div>
+  <div class="card"><h4>⑤+⑧ 기억과 가시성</h4><p class="small">시맨틱 메모리가 쌓일수록 사용량/헬스 대시보드의 관리 가치가 커진다.</p></div>
+</div>
+<div class="note warn"><b>라이선스 주의</b> — open-webui · lobehub(lobe-chat) · n8n은 커스텀/fair-code 라이선스(실측 NOASSERTION)다. 코드 반입은 피하고 패턴만 참고할 것. LibreChat(46.4천★, MIT)은 안전한 참고 대상이다.</div>
+
+<h2 id="s9"><span class="no">9.</span>방법론 부록</h2>
+<ul class="small">
+  <li>조사 축: A 제품 정체 / B 에이전트 플랫폼 / C 챗 UI / D 메모리 / E 음성 / F 자동화·브라우저·모델 — 각 축 전용 조사 라인 운영(2웨이브, 수렴 판정: 신규 실행 가능 리드 소진).</li>
+  <li>도구 제약: 범용 웹 검색·웹리더 MCP가 한도 소진(2026-11-04 reset)이어서 <b>GitHub API(gh 인증) 35회 + 공식 문서 페치 8회</b>로 대체 실측했다.</li>
+  <li>클레임 등급: 스타·라이선스·활성일은 전부 <b>측정값</b>(2026-10-29). 폐쇄형 제품의 존재는 간접 증거 <b>파생</b>. 공식 제품 페이지 기능 상세는 미검증 — 제안에 인용하지 않음.</li>
+  <li>원저널: <code>.omo/ulw-research/20261029-084417/</code> (source-register · claim-lineage · SYNTHESIS · notepad).</li>
+</ul>
+
+<h2 id="s10"><span class="no">10.</span>출처</h2>
+<table class="small">
+  <thead><tr><th>#</th><th>출처</th><th>유형</th><th>접근일</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="https://github.com/openclaw/openclaw">github.com/openclaw/openclaw</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>2</td><td><a href="https://github.com/stablyai/orca">github.com/stablyai/orca</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>3</td><td><a href="https://github.com/feder-cr/invisible_dots">github.com/feder-cr/invisible_dots</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>4</td><td><a href="https://github.com/letta-ai/letta">github.com/letta-ai/letta</a> + docs.letta.com/guides/agents/memory</td><td>1차+공식문서</td><td>2026-10-29</td></tr>
+    <tr><td>5</td><td><a href="https://github.com/mem0ai/mem0">github.com/mem0ai/mem0</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>6</td><td><a href="https://github.com/getzep/graphiti">github.com/getzep/graphiti</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>7</td><td><a href="https://github.com/pipecat-ai/pipecat">github.com/pipecat-ai/pipecat</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>8</td><td><a href="https://github.com/browser-use/browser-use">github.com/browser-use/browser-use</a> — 저장소 API + README</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+    <tr><td>9</td><td>GitHub Search API — "Grok Bot" / "Meta Muse assistant" / "Claude Duet" / "hermes agent" 질의</td><td>커뮤니티</td><td>2026-10-29</td></tr>
+    <tr><td>10</td><td>GitHub 저장소 API 일괄 실측 — LibreChat·lobehub·open-webui·n8n·Composio·Ollama·Jan·LiveKit·openai-realtime-agents·MemOS·crewAI·autogen·agno·home-assistant·stagehand·MCP servers·AionUi·cc-switch·open-duet·hermes-official-plugins·rakazo</td><td>1차(코드)</td><td>2026-10-29</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  OpenBot 적용 제안 보고서 v1.0 · 2026-10-29 · 생성: ULW-Research 프로토콜(오케스트레이터 직접 조사) ·
+  모든 스타/라이선스 수치는 기재일 GitHub API 실측값 · 다음 단계: Tier 1(①~③) 구현 승인 대기 중
+</footer>
+
+</div>
+</body>
+</html>

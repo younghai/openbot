@@ -1,0 +1,21 @@
+import { Hono } from "hono";
+import { botsRouter } from "./routes/bots.js";
+import { conversationsRouter } from "./routes/conversations.js";
+import { computersRouter } from "./routes/computers.js";
+import { modelsRouter } from "./routes/models.js";
+import { sourcesRouter } from "./routes/sources.js";
+import { routinesRouter } from "./routes/routines.js";
+import { platformRouter } from "./routes/platform.js";
+import { tasksRouter } from "./routes/tasks.js";
+import { filesRouter } from "./routes/files.js";
+
+export const api = new Hono();
+api.route("/", botsRouter);
+api.route("/", conversationsRouter);
+api.route("/", computersRouter);
+api.route("/", modelsRouter);
+api.route("/", sourcesRouter);
+api.route("/", routinesRouter);
+api.route("/", tasksRouter);
+api.route("/", filesRouter);
+api.route("/", platformRouter);

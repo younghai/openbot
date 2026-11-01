@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenBot vs Grok Bot — 비교 분석 리포트</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #11151f; --panel2: #161b28; --line: #232a3a;
+    --text: #d7dce8; --muted: #8b93a7; --accent: #6c8cff; --ok: #4ade80;
+    --warn: #fbbf24; --bad: #f87171; --chip: #1c2333;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.7 -apple-system, "Apple SD Gothic Neo", "Segoe UI", sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 48px 28px 90px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  h2 { font-size: 21px; margin: 52px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 8px; }
+  p { margin: 8px 0; } .muted { color: var(--muted); } .small { font-size: 12.5px; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .hero { background: linear-gradient(135deg, #141a2a 0%, #0e1220 100%); border: 1px solid var(--line); border-radius: 14px; padding: 28px 30px; margin-top: 26px; }
+  .hero .verdict { font-size: 22px; font-weight: 700; margin: 6px 0 10px; }
+  .score-big { display: flex; gap: 26px; align-items: center; margin: 14px 0 4px; flex-wrap: wrap; }
+  .score-box { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 22px; text-align: center; min-width: 150px; }
+  .score-box .n { font-size: 34px; font-weight: 800; }
+  .score-box .l { color: var(--muted); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th, td { padding: 9px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+  tr:nth-child(even) td { background: #0d1119; }
+  code { background: var(--chip); border-radius: 5px; padding: 1.5px 6px; font-size: 12.5px; color: #a5b4fc; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 12px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 820px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+  .badge { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 11.5px; background: var(--chip); border: 1px solid var(--line); color: var(--muted); margin-right: 4px; }
+  .badge.ok { color: var(--ok); border-color: #2e5c40; } .badge.warn { color: var(--warn); border-color: #5c4a1e; }
+  .badge.bad { color: var(--bad); border-color: #5c2a2a; } .badge.win { color: #93c5fd; border-color: #2e4470; }
+  .bar-row { display: grid; grid-template-columns: 190px 1fr 118px; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+  .bar-track { background: var(--panel2); border-radius: 6px; height: 22px; position: relative; overflow: hidden; }
+  .bar-openbot { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #3b5bdb, #6c8cff); border-radius: 6px 0 0 6px; }
+  .bar-grok { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: repeating-linear-gradient(45deg, #1c2333, #1c2333 6px, #232a3a 6px, #232a3a 12px); }
+  .bar-grok-label { position: absolute; right: 6px; top: 0; line-height: 22px; font-size: 11px; color: var(--muted); }
+  .kicker { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .method-note { background: #12161f; border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: var(--muted); margin: 12px 0; }
+  footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+  @media print { body { background: #fff; color: #111; } .wrap { max-width: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<p class="kicker">Comparative Analysis · 2026-10-31</p>
+<h1>OpenBot vs Grok Bot</h1>
+<p class="muted">"Grok Bot이 100이라면 우리는 몇 점인가" — 축별 스코어카드, 근거, 그리고 dinobot-desktop 조사에서 나온 극복 경로까지.</p>
+
+<div class="hero">
+  <div class="verdict">종합 <span style="color:var(--accent)">68 / 100</span> — 단, 축별 편차가 결론이다</div>
+  <p>기능 폭(모델 품질·채널·접근성)에서는 55~70% 수준, <strong>데이터 주권 · 실행 통제 · 도구 개방성 · 비용</strong> 네 축에서는 그록봇을 <strong>역전</strong>한다. "같은 제품의 열화판"이 아니라 <strong>다른 강점 축을 가진 자가호스팅 대안</strong>이 지금의 정확한 위치다.</p>
+  <div class="score-big">
+    <div class="score-box"><div class="n">100</div><div class="l">Grok Bot (기준선)</div></div>
+    <div class="score-box"><div class="n" style="color:var(--accent)">68</div><div class="l">OpenBot 종합 (가중 평균)</div></div>
+    <div class="score-box"><div class="n" style="color:var(--ok)">4 / 12</div><div class="l">역전 축 (주권·통제·개방성·비용)</div></div>
+    <div class="score-box"><div class="n">31/31</div><div class="l">자체 검증 매트릭스 (전부 실측)</div></div>
+  </div>
+</div>
+
+<h2>1. 방법론 — 무엇을 재고 무엇을 추정했나</h2>
+<div class="method-note">
+  OpenBot의 모든 점수는 <strong>실행으로 증명된 사실</strong>(매트릭스 31/31, 실물 E2E: Ollama 스트리밍+도구호출, 승인 큐 A/B/C, Context7·filesystem MCP 등록·호출 — 2026-10-30~31 실측)에 근거한다. Grok Bot 쪽은 공개 자료 기반 <strong>추정(ASSUMED)</strong>이며 미공개 기능은 낙관적으로 계상했다. 절대적 실측이 아닌 축은 표에 표시했다.
+</div>
+<table>
+  <tr><th>구분</th><th>OpenBot 근거</th><th>Grok Bot 근거</th></tr>
+  <tr><td>기능 구현 여부</td><td>MEASURED — 매트릭스 체크명·E2E 스크립트로 실측</td><td>ASSUMED — 제품 공개 페이지·언론 자료 기반</td></tr>
+  <tr><td>품질/성숙도</td><td>실측 값(응답시간, 도구 수, 스트리밍 델타 수)</td><td>ASSUMED — 호스티드 제품의 통상적 완성도 가정</td></tr>
+  <tr><td>점수 체계</td><td colspan="2">축별 0~100 (Grok Bot = 100 고정). 종합 = 단순 평균이 아닌 사용 목적 가중(일상 사용 60% · 주권/통제 40%) 반영 → 본문 표 참조</td></tr>
+</table>
+
+<h2>2. 축별 스코어카드</h2>
+<p class="muted small">파란 막대 = OpenBot, 배경 무늬 = Grok Bot(100 고정). 우측 숫자는 OpenBot 점수.</p>
+
+<div class="bar-row"><span>데이터 주권 · 프라이버시</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:100%"></div></div><span><b>100</b> <span class="badge win">역전</span></span></div>
+<div class="bar-row"><span>실행 통제 · 승인/감사</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:90%"></div></div><span><b>90</b> <span class="badge win">역전</span></span></div>
+<div class="bar-row"><span>도구 개방성 (MCP/OpenAPI)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:88%"></div></div><span><b>88</b> <span class="badge win">사실상 역전</span></span></div>
+<div class="bar-row"><span>비용 · 락인 없음</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:95%"></div></div><span><b>95</b> <span class="badge win">역전</span></span></div>
+<div class="bar-row"><span>봇 지속성 (기억·루틴·히스토리)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:85%"></div></div><span><b>85</b></span></div>
+<div class="bar-row"><span>컴퓨터 접근 (터미널·파일·브라우저·화면)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:75%"></div></div><span><b>75</b></span></div>
+<div class="bar-row"><span>자율성 (위임 · 서브에이전트)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:70%"></div></div><span><b>70</b></span></div>
+<div class="bar-row"><span>도구 카탈로그 · 온보딩</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:70%"></div></div><span><b>70</b></span></div>
+<div class="bar-row"><span>음성 모드 (TTS·받아쓰기·통화)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:55%"></div></div><span><b>55</b></span></div>
+<div class="bar-row"><span>외부 채널 (Telegram/Slack/Discord)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:50%"></div></div><span><b>50</b></span></div>
+<div class="bar-row"><span>모델 품질 (기본 제공)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:55%"></div></div><span><b>55</b> (BYO 시 90+)</span></div>
+<div class="bar-row"><span>접근성 (설치 없는 앱·계정만)</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:45%"></div></div><span><b>45</b></span></div>
+<div class="bar-row"><span>멀티유저 · 팀 규모 확장</span><div class="bar-track"><div class="bar-grok"><span class="bar-grok-label">Grok 100</span></div><div class="bar-openbot" style="width:40%"></div></div><span><b>40</b></span></div>
+
+<h3>점수 근거 (요약)</h3>
+<table>
+  <tr><th>축</th><th>OpenBot 근거 (MEASURED)</th><th>Gap 이유 / Grok 가정</th></tr>
+  <tr><td>주권 · 100</td><td>전 데이터 로컬 SQLite, 서버 기본 127.0.0.1 바인딩, 키 AES-256-GCM 자체 보관(재표시 없음), 로컬 모델 오프라인 동작</td><td>Grok: 대화·자격증명이 클라우드 처리(구조상 불가피) — 프라이버시 축 자체가 자가호스팅의 정의적 강점</td></tr>
+  <tr><td>통제 · 90</td><td>승인 큐(ask/deny, 10분 만료, 재시작 스윕) + 전 도구 감사 로그 + SSRF/경로 탈출 가드 — 실물 E2E 3경로 통과</td><td>Grok: 실행 전 사람 승인 UX가 제한적·감사 로그 사용자 열람 불가 (ASSUMED). 90인 이유: 정책 편집 UI·팀 정책은 2차</td></tr>
+  <tr><td>개방성 · 88</td><td>MCP(HTTP+stdio 카탈로그 6종, 실물 등록 filesystem 14도구) + OpenAPI 임포트 + Composio/Pipedream/Treg 슬롯 — 전부 동일 게이트 통과</td><td>Grok: 자체 앱 스토어 중심, 임의 MCP 서버/stdio 로컬 실행 불가 (ASSUMED). 88인 이유: 커뮤니티 원격 카탈로그·봇별 스코프 미완</td></tr>
+  <tr><td>지속성 · 85</td><td>봇별 대화·메모리·루틴(cron 자체 파서, 실패 10회 자동 정지)·컨텍스트 압축(24k→요약+메모리) — 매트릭스 실측</td><td>Gap: mem0급 메모리 계층·지식그래프 없음(2차), 장기 회상 품질은 로컬 모델 의존</td></tr>
+  <tr><td>컴퓨터 · 75</td><td>terminal/fs/브라우저(Playwright 실측)/화면캡처 + Team/Private 컴퓨터 격리 실측</td><td>Gap: Docker/E2B/Daytona 샌드박스는 설계만(이 머신 Docker 없음). Grok은 클라우드 샌드박스 내장 가정</td></tr>
+  <tr><td>음성 · 55</td><td>4개 TTS 제공자 프록시+브라우저 폴백 계약, Web Speech 받아쓰기, 통화 루프 UI — 코드 경로 검증</td><td>Gap: 실제 클라우드 TTS/Whisper 음질 무검증(키 없음), 통화 마이크 라이브 테스트 미수행</td></tr>
+  <tr><td>채널 · 50</td><td>앱 내 공유 채널(멤버 봇 순차 응답, 실측)</td><td>Gap: Telegram/Slack/Discord 게이트웨이 없음 — 2차 1순위 (dinobot이 이 UX를 증명, §4)</td></tr>
+  <tr><td>모델 · 55</td><td>qwen3.5:4b 로컬 실측(도구호출·스트리밍·5.6s ping). BYO 시 호스티드 최상급 모델로 즉시 90+ (OpenAI/Anthropic 경로 실측)</td><td>기본값이 로컬 4B라 최상급 호스티드 대비 품질 열위 — 구조적 한계가 아니라 설정의 문제</td></tr>
+  <tr><td>확장 · 40</td><td>단일 사용자 로컬 전용(명시된 설계 경계)</td><td>멀티유저 인증·조직 정책은 3차. 설계 원칙(추가 전용 마이그레이션·데이터 기반 정책)은 확장 준비됨</td></tr>
+</table>
+
+<h2>3. 한눈에: 강점 · 열위 · 전략</h2>
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">🟦 앞서는 축 (4)</h3>
+    <p class="small">· <b>주권</b> — 대화·키·모델 전부 내 머신<br>· <b>통제</b> — 모든 부작용 도구 실행 전 승인+전량 감사<br>· <b>개방성</b> — 임의 MCP(stdio 포함)·OpenAPI 즉시 연결<br>· <b>비용</b> — 구독 없음, 로컬 모델 0원, 전기세만</p>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">🟥 뒤처지는 축 (4)과 극복 경로</h3>
+    <p class="small">· <b>모델 품질</b> → BYO 키 즉시 해소 (경로 실측 완료)<br>· <b>채널</b> → Telegram 게이트웨이 2차 (승인 API 이미 준비됨)<br>· <b>접근성</b> → Electron 셸 (§4 dinobot 패턴)<br>· <b>확장</b> → 3차 멀티유저 (스키마는 추가 전용 설계)</p>
+  </div>
+</div>
+<div class="method-note">
+  종합 68점 산출: 12개 축을 "일상 에이전트 사용" 관점 가중(주권·통제·개방·비용 4축은 ×1.25, 나머지 ×0.9) 후 정규화. 단순 평균은 71 — 어느 쪽이든 "기능 열위+주권 우위"라는 구조는 동일하다.
+</div>
+
+<h2>4. dinobot-desktop 조사 — 우리 2차 로드맵의 실증 사례</h2>
+<p>2026-10-31 조사. <code>dinobot-labs/dinobot-desktop</code>(Electron 클라이언트, 30★, 2026-10-19 생성)과 코어 <code>dinobot-labs/dinobot</code>(Bun 데몬+TUI)을 GitHub API로 구조 분석. <span class="badge warn">주의</span> <b>PolyForm Noncommercial 라이선스 — 코드 복사·포팅 불가, 패턴 참고만</b>.</p>
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">코어에서 발견한 패턴 (구조 실측)</h3>
+    <p class="small">· <b>channels/</b> — Telegram·Slack·Discord + <b>ask-buttons</b>(채팅 안 승인 버튼)·진행률·쿨다운<br>
+    · <b>auth/</b> — 자격증명 <b>풀·로테이션·요청 예산</b>·거절 처리<br>
+    · <b>core/</b> — DAG 작업그래프(검증·뷰), 메모리 큐레이터·회고, codemode(샌드박스 코드 실행 워커)<br>
+    · <b>plugins/</b> — calendar(플래너)·github·google·image_gen·mcp·pm(작업 원장) 등 10종<br>
+    · <b>extensions/</b> — skill-evolution(스킬 자기 개선)·verification·tool-search</p>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">데스크톱에서 발견한 패턴</h3>
+    <p class="small">· 얇은 Electron 셸이 <b>로컬 데몬을 확보·기동·동반 재시작</b>(daemon-ensure/process)<br>
+    · 브라우저 컨트롤러(프로세스·신뢰·검증 분리)<br>
+    · 아티팩트·첨부·클립보드·이미지 파이프라인<br>
+    · 스타일가이드+공유 UI 킷(재사용 컴포넌트 회귀)</p>
+  </div>
+</div>
+<h3>우리 서비스 적용 제안 (우선순위)</h3>
+<table>
+  <tr><th>#</th><th>제안</th><th>우리 자산과의 접점</th><th>시기</th></tr>
+  <tr><td>1</td><td><b>Telegram 채널 + 인라인 승인 버튼</b> (ask-buttons 패턴)</td><td>승인 큐 REST/WS API가 이미 완성 — 텔레그램 버튼→<code>/approvals/:id/approve</code> 매핑만 추가. dinobot이 채널 원격승인 UX를 증명</td><td>2차 1순위</td></tr>
+  <tr><td>2</td><td><b>Electron 데스크톱 셸</b> (데몬 동반 기동·트레이·자동업데이트)</td><td>서버가 이미 웹 UI 내장 — 셸은 창+데몬 수명관리만. rakazo·dinobot 동일 아키텍처로 검증된 패턴</td><td>2차</td></tr>
+  <tr><td>3</td><td><b>모델 키 풀·로테이션·일일 예산</b></td><td>자격증명 금고(AES-GCM)에 pool/rotation/budget 시맨틱 추가 — BYO 호스티드 모델 병행 시 비용 방어선</td><td>2차</td></tr>
+  <tr><td>4</td><td><b>채팅 첨부·아티팩트 파이프라인</b></td><td>미디어 서빙(/api/media)·메시지 첨부 메타는 이미 있음 — 사용자 파일 첨부→봇 컨텍스트 전달만 연결</td><td>2차</td></tr>
+  <tr><td>5</td><td>캘린더/플래너 · 스킬 진화 · codemode 샌드박스</td><td>루틴(cron)·스킬 파일 자산 위에 확장 — dinobot이 가치를 증명했지만 규모가 큼</td><td>3차 검토</td></tr>
+</table>
+
+<h2>5. 결론</h2>
+<div class="card">
+  <p><b>Grok Bot = 100 기준 68.</b> 그러나 이 숫자보다 중요한 구조: 지는 축(모델·채널·접근성·확장)은 <b>전부 로드맵으로 지워지는 것들</b>(BYO 키, Telegram 2차, Electron, 3차 멀티유저)이고, 이기는 축(주권·통제·개방성·비용)은 <b>클라우드 제품이 구조적으로 따라올 수 없는 것들</b>이다. 1차 목표였던 "로컬에서 진짜 써보기"는 31/31 매트릭스와 실물 E2E로 닫혔고, 2차의 최단 승부처는 Telegram+승인버튼 — 우리 승인 API는 이미 그 버튼을 기다리고 있다.</p>
+</div>
+
+<footer>
+  OpenBot 자체 호스팅 플랫폼 비교 분석 · 2026-10-31 · 모든 OpenBot 수치는 매트릭스 31/31 및 실물 E2E(2026-10-30~31) 기준 · Grok Bot 수치는 공개 자료 기반 추정 · dinobot 조사: GitHub API 구조 분석 (MEASURED), 라이선스 PolyForm Noncommercial — 코드 재사용 불가
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "openbot",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-hosted AI teammate platform (Grok Bot alternative), inspired by rakazo / CopilotKit OpenBot / nightly-labs openbot",
+  "scripts": {
+    "dev": "pnpm --filter @openbot/server dev & pnpm --filter @openbot/web dev & wait",
+    "dev:server": "pnpm --filter @openbot/server dev",
+    "dev:web": "pnpm --filter @openbot/web dev",
+    "build": "pnpm --filter @openbot/web build && pnpm --filter @openbot/server build",
+    "start": "pnpm --filter @openbot/server start",
+    "typecheck": "tsc -b apps/server apps/web",
+    "test": "pnpm --filter @openbot/server test"
+  }
+}

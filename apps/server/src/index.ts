@@ -23,6 +23,15 @@ startRoutineScheduler();
 // orphaned 'running' jobs cannot survive a restart — fail them so the queue moves
 db.prepare("UPDATE queue_jobs SET status='error', result='interrupted by server restart', finished_at=? WHERE status='running'").run(Date.now());
 void kickQueue();
+pruneState();
+setInterval(pruneState, 24 * 60 * 60 * 1000).unref();
+function pruneState(): void {
+  const days = Number(process.env.STATE_RETENTION_DAYS ?? 30);
+  const cutoff = Date.now() - days * 86_400_000;
+  db.prepare("DELETE FROM queue_jobs WHERE finished_at IS NOT NULL AND finished_at < ?").run(cutoff);
+  db.prepare("DELETE FROM audit_log WHERE created_at < ?").run(Date.now() - Math.max(days, 90) * 86_400_000);
+  db.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < ?").run(cutoff);
+}
 
 const app = new Hono();
 app.route("/api", api);

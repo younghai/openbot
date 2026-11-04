@@ -205,6 +205,11 @@ registerTool({
   },
   async execute(ctx, args) {
     try {
+      const conv = ctx.conversationId ? (db.prepare("SELECT kind FROM conversations WHERE id=?").get(ctx.conversationId) as { kind: string } | undefined) : undefined;
+      const scope = conv?.kind === "channel" ? "channel" : "dm";
+      db.prepare("UPDATE memories SET scope=? WHERE rowid=(SELECT rowid FROM memories WHERE bot_id=? ORDER BY created_at DESC LIMIT 1)").run(scope, ctx.bot.id);
+    } catch { /* scope best-effort */ }
+    try {
       const slug = String(args.content ?? "memory").toLowerCase().replace(/[^가-힣a-z0-9]+/g, "-").slice(0, 24).replace(/^-|-$/g, "") || "note";
       const dir = path.join(MEMORY_DIR, slugDir(ctx.bot.name));
       fs.mkdirSync(dir, { recursive: true });

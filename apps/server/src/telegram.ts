@@ -16,11 +16,25 @@ import { credentialFor } from "./voice.js";
 
 interface TgUpdate {
   update_id: number;
-  message?: { chat: { id: number }; from?: { first_name?: string }; text?: string };
-  callback_query?: { id: string; data: string; message?: { chat: { id: number }; message_id: number } };
+  message?: { chat: { id: number }; message_id?: number; from?: { id: number; first_name?: string }; text?: string };
+  callback_query?: { id: string; data: string; from?: { id: number }; message?: { chat: { id: number }; message_id: number } };
+}
+
+/** Telegram user allowlist (deepseek-bot pattern): TELEGRAM_ALLOWED_USERS credential,
+ * comma-separated numeric ids. Empty = open (with a boot warning). */
+function allowedUsers(): Set<number> {
+  const raw = credentialFor("TELEGRAM_ALLOWED_USERS") ?? "";
+  return new Set(raw.split(",").map((x) => Number(x.trim())).filter((n) => Number.isFinite(n) && n > 0));
+}
+
+function userAllowed(id: number | undefined): boolean {
+  const allow = allowedUsers();
+  if (allow.size === 0) return true;
+  return id !== undefined && allow.has(id);
 }
 
 const chatBinds = new Map<number, string>(); // telegram chat id -> bot id
+const lastIncomingByChat = new Map<number, number>();
 let running = false;
 let offset = 0;
 
@@ -49,6 +63,10 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
   if (u.message?.text) {
     const chatId = u.message.chat.id;
     const text = u.message.text.trim();
+    if (!userAllowed(u.message.from?.id)) {
+      await tg("sendMessage", { chat_id: chatId, text: "등록되지 않은 사용자입니다. 이 봇은 허용목록(TELEGRAM_ALLOWED_USERS)에 등록된 사용자만 사용할 수 있습니다." }).catch(() => undefined);
+      return;
+    }
     if (text === "/start" || text.startsWith("/bot")) {
       const target = text.startsWith("/bot ")
         ? (db.prepare("SELECT id FROM bots WHERE name=? COLLATE NOCASE").get(text.slice(5).trim()) as { id: string } | undefined)?.id
@@ -65,11 +83,17 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
     const botId = chatBinds.get(chatId) ?? bindTarget();
     if (!botId) return;
     const conv = getOrCreateDmConversation(botId);
+    lastIncomingByChat.set(chatId, u.message.message_id ?? 0);
+    void tg("setMessageReaction", { chat_id: chatId, message_id: u.message.message_id ?? 0, emoji: "\ud83d\udc40" }).catch(() => undefined);
     await enqueueFromHttp(conv.id, text);
     return;
   }
   if (u.callback_query) {
     const cb = u.callback_query;
+    if (!userAllowed(cb.from?.id)) {
+      await tg("answerCallbackQuery", { callback_query_id: cb.id }).catch(() => undefined);
+      return;
+    }
     const [, kind, id] = String(cb.data).split(":");
     await tg("answerCallbackQuery", { callback_query_id: cb.id }).catch(() => undefined);
     if (kind === "ap" || kind === "dn") {
@@ -88,6 +112,8 @@ function wireOutbound(): void {
         const conv = getOrCreateDmConversation(botId);
         if (e.conversationId === conv.id && e.botId === botId) {
           void tg("sendMessage", { chat_id: chatId, text: (e.content as string).slice(0, 3800) }).catch(() => undefined);
+          const lastIncoming = lastIncomingByChat.get(chatId);
+          if (lastIncoming) void tg("setMessageReaction", { chat_id: chatId, message_id: lastIncoming, emoji: "\ud83d\udc4c" }).catch(() => undefined);
         }
       }
     }

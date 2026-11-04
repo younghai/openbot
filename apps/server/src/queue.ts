@@ -93,6 +93,13 @@ export function cancelJob(jobId: string): boolean {
   return res.changes > 0;
 }
 
+/** Cancel every pending/running job in a conversation (steering "stop"). */
+export function cancelByConversation(conversationId: string): number {
+  const rows = db.prepare("SELECT id FROM queue_jobs WHERE conversation_id=? AND status IN ('pending','running')").all(conversationId) as { id: string }[];
+  for (const r of rows) cancelJob(r.id);
+  return rows.length;
+}
+
 export function listJobs(limit = 50): JobRow[] {
   return db.prepare("SELECT * FROM queue_jobs ORDER BY created_at DESC LIMIT ?").all(limit) as unknown as JobRow[];
 }

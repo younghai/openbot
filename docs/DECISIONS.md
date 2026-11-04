@@ -15,3 +15,5 @@
 | 승인 대기는 executeTool 안에서 promise 블록 | gateway가 단일 choke point라 정적·동적·위임 도구가 같은 게이트를 지님; 해당 봇의 FIFO 잡만 대기 | 잡 상태 머신에 승인 단계 추가, 도구별 사전 체크 분산 |
 | OpenAI 호환 SSE 직접 파싱(tool_calls 조각 조립) | 로컬 모델은 느려서 델타 스트리밍이 UX 필수; 비스트리밍 응답은 폴백으로 수용 | SDK 의존 추가, 비스트리밍 유지 |
 | 미결 승인은 만료(=거부)가 안전 방향 | 재시작 후 대기 없는 승인은 무인 실행 허용과 같음 | 재시작 후 재대기, 자동 승인 |
+| 샌드박스 deny는 regex+realpath로만 | 실측: darwin 25에서 subpath file-read* deny 무시, /var firmlink로 /var/... regex 미매치 | subpath deny, symlink 경로 그대로 |
+| 외부 콘텐츠는 경계+플래그 | 도구 게이트는 실행 전이고 인젝션은 컨텍스트 오염이라 별도 게이트 필요(deepseek-bot injection.ts) | 외부 콘텐츠 차단, 모델에게만 맡김 |

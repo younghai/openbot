@@ -32,8 +32,12 @@ wss.on("connection", (ws: WebSocket) => {
         const attachments = Array.isArray(msg.attachments)
           ? (msg.attachments as { path: string; name?: string; contentType?: string }[]).filter((a) => typeof a?.path === "string").slice(0, 4)
           : undefined;
-        const jobId = await enqueueFromHttp(String(msg.conversationId ?? ""), String(msg.content ?? ""), attachments);
-        send({ type: "chat.accepted", jobId, conversationId: msg.conversationId });
+        const res = await enqueueFromHttp(String(msg.conversationId ?? ""), String(msg.content ?? ""), attachments);
+        if (typeof res === "string" && res.startsWith("__")) {
+          send({ type: "chat.steered", steered: res.replace(/^__|$/g, "").replace(/__/g, ""), conversationId: msg.conversationId });
+        } else {
+          send({ type: "chat.accepted", jobId: res, conversationId: msg.conversationId });
+        }
       } catch (err) {
         send({ type: "chat.error", error: err instanceof Error ? err.message : String(err) });
       }

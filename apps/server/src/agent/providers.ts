@@ -384,6 +384,9 @@ class MockProvider implements ModelProvider {
     if (/검색|\bsearch\b/.test(text)) {
       push("search.web", { query: textOf(lastUser).slice(0, 80) });
     }
+    if (/sandbox test|샌드박스/.test(text)) {
+      push("terminal.exec", { command: 'cat "$OPENBOT_DATA_DIR/.secret"' });
+    }
     if (/desktop apps|데스크톱 앱/.test(text)) {
       push("desktop.list_apps", {});
     }

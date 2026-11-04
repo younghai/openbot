@@ -576,6 +576,63 @@ let fixProviderBotConv = "";
     `apps=${installed ? result.apps.length + "개" : "미설치"} snapshot=${snap?.snapshotId ? `refs=${snap.refCount}` : "미설치/에러"}`);
 }
 
+// 17q. injection guard: external tool results carry a boundary + flag hostile instructions
+{
+  const src = await api("/api/tool-sources", { method: "POST", body: JSON.stringify({ name: "mcpsrc2", kind: "mcp", url: `http://127.0.0.1:${fixture.port}/mcp` }) });
+  const s = await send(fixProviderBotConv, "injection test 해줘");
+  const msgs = await messagesOf(fixProviderBotConv);
+  const toolMsg = msgs.reverse().find((m) => m.role === "tool" && m.tool_name === "mcp.mcpsrc2.inject");
+  const result = toolMsg ? JSON.parse(toolMsg.tool_result) : null;
+  record("injection guard (external content boundary)",
+    src.body.status === "ok" && Boolean(result?._contentBoundary) && result?._injectionFlagged === true && Array.isArray(result?._injectionWhy) && result?._injectionWhy.length >= 2,
+    `boundary=${Boolean(result?._contentBoundary)} flagged=${result?._injectionFlagged} why=${(result?._injectionWhy ?? []).join("|").slice(0, 60)}`);
+}
+
+// 17r. terminal read confinement: vault secret unreadable under sandbox-exec
+{
+  const g = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "Sandboxy", emoji: "🛡" }) });
+  const s = await send(g.body.conversationId, "sandbox test");
+  const msgs = await messagesOf(g.body.conversationId);
+  const toolMsg = msgs.reverse().find((m) => m.role === "tool" && m.tool_name === "terminal.exec");
+  const result = toolMsg ? JSON.parse(toolMsg.tool_result) : null;
+  const denied = result?.exitCode !== 0 || /sandbox|Operation not permitted|not permitted/i.test(String(result?.stderr ?? ""));
+  const leaked = String(result?.stdout ?? "").includes("v1:");
+  record("terminal read confinement (sandbox-exec)",
+    s.status === "done" && denied && !leaked,
+    `exit=${result?.exitCode} denied=${denied} leaked=${leaked} stderr="${String(result?.stderr ?? "").slice(0, 60)}"`);
+}
+
+// 17s. telegram user allowlist: strangers refused, allowed user works
+{
+  await api("/api/settings/credentials", { method: "PUT", body: JSON.stringify({ key: "TELEGRAM_ALLOWED_USERS", value: "4242" }) });
+  const sentBefore = fixture.tgSent.length;
+  fixture.tgQueue.push({ update_id: 9101, message: { chat: { id: 5555 }, from: { id: 9999 }, text: "terminal 로 run 해줘" } });
+  await new Promise((r) => setTimeout(r, 4000));
+  const refused = fixture.tgSent.slice(sentBefore).some((m) => String(m.text ?? "").includes("등록되지 않은"));
+  const noJob = fixture.tgSent.slice(sentBefore).every((m) => !String(m.text ?? "").includes("승인 요청"));
+  const sentBefore2 = fixture.tgSent.length;
+  fixture.tgQueue.push({ update_id: 9102, message: { chat: { id: 4242 }, from: { id: 4242 }, text: "terminal 로 run 해줘" } });
+  const approvalPushed = await waitFor(async () => fixture.tgSent.slice(sentBefore2).some((m) => String(m.text ?? "").includes("승인 요청")), 40_000, "allowed approval push");
+  await api("/api/settings/credentials", { method: "PUT", body: JSON.stringify({ key: "TELEGRAM_ALLOWED_USERS", value: "" }) });
+  record("telegram user allowlist",
+    refused && noJob && approvalPushed,
+    `strangerRefused=${refused} strangerNoJob=${noJob} allowedPush=${approvalPushed}`);
+}
+
+// 17t. steering words: usage answers without a model turn; stop is quiet
+{
+  const u = await api(`/api/conversations/${alphaConv}/messages`, { method: "POST", body: JSON.stringify({ content: "usage" }) });
+  await new Promise((r) => setTimeout(r, 800));
+  const msgs = await messagesOf(alphaConv);
+  const usageReply = msgs.reverse().find((m) => m.role === "assistant" && m.content.includes("토큰"));
+  const st = await api(`/api/conversations/${alphaConv}/messages`, { method: "POST", body: JSON.stringify({ content: "그만." }) });
+  const msgs2 = await messagesOf(alphaConv);
+  const stopReply = msgs2.reverse().find((m) => m.role === "assistant" && (m.content.includes("없습니다") || m.content.includes("중단")));
+  record("steering words (usage/stop)",
+    u.body.steered === "steered_usage" && Boolean(usageReply) && st.body.steered === "steered_stop" && Boolean(stopReply),
+    `usage=${u.body.steered}/${Boolean(usageReply)} stop=${st.body.steered}/${Boolean(stopReply)}`);
+}
+
 // 18. composio without key → clear error
 {
   const r = await api("/api/tool-sources", { method: "POST", body: JSON.stringify({ name: "comp", kind: "composio" }) });

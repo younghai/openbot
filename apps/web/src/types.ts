@@ -268,6 +268,7 @@ export type ServerEvent =
   | { type: "hello"; version: string }
   | { type: "pong" }
   | { type: "chat.accepted"; jobId: string; conversationId: string }
+  | { type: "chat.steered"; steered: string; conversationId: string }
   | { type: "chat.message"; conversationId: string; botId: string | null; role: "user" | "assistant"; content: string }
   | { type: "delta"; botId: string; conversationId: string | null; text: string; jobId?: string }
   | { type: "thinking"; botId: string; conversationId: string | null; chars: number; jobId?: string }

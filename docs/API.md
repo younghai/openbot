@@ -109,3 +109,9 @@ OpenAI 호환 provider는 SSE 스트리밍으로 응답하며(비스트리밍 �
 - 신규 도구: `desktop.list_apps {}` · `desktop.snapshot {app, windowId?, root?, skeleton?, waitFor?}` · `desktop.act {action, ref|combo|app, text?, waitFor?}` — agent-desktop(accessibility tree) 래핑. 정책: 관찰 allow / 조작 ask.
 - 에러 계약: 도구 실패 메시지에 `[CODE · 재시도 안전/위험 — 제안]` 힌트(retryHint). STALE_REF/AMBIGUOUS_TARGET은 재스냅샷 안내 포함.
 - 부팅 시 고아 running 잡 → `error(interrupted by server restart)` 복구.
+
+## Security hardening (2026-11-04, deepseek-bot patterns)
+
+- 인젝션 게이트: 외부 도구 결과에 `_contentBoundary` 상시, 지시문 패턴 시 `_injectionFlagged`·`_injectionWhy[]` 추가(모양 보존).
+- `POST /api/conversations/:id/messages` 응답 확장: 스티어링 단어 처리 시 `{jobId: null, steered: "steered_stop"|"steered_usage"|"steered_mute"|"steered_unmute"}`. WS 이벤트 `chat.steered`.
+- 로컬 터미널은 sandbox-exec denylist 하에 실행(해제 `OPENBOT_DISABLE_SANDBOX=1`). 텔레그램 `TELEGRAM_ALLOWED_USERS` 자격증명으로 사용자 제한.

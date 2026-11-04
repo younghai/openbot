@@ -194,6 +194,11 @@ CREATE TABLE IF NOT EXISTS approvals (
   for (const [tool, mode] of seed) ins.run(tool, mode);
 }
 
+
+// ---- additive migrations (2026-11-04): steering mute + memory channel scope ----
+try { db.exec("ALTER TABLE conversations ADD COLUMN muted INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'dm'"); } catch { /* exists */ }
+
 export const uid = (): string => crypto.randomUUID();
 export const now = (): number => Date.now();
 

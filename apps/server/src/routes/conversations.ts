@@ -71,8 +71,12 @@ conversationsRouter.post("/conversations/:id/messages", async (c) => {
   if (!conv) return c.json({ error: "conversation not found" }, 404);
   if (!content.trim() && !attachments?.length) return c.json({ error: "content required" }, 400);
   const { enqueueFromHttp } = await import("../chat.js");
-  const jobId = await enqueueFromHttp(convId, content, attachments as ChatAttachment[] | undefined);
-  return c.json({ jobId }, 202);
+  const res = await enqueueFromHttp(convId, content, attachments as ChatAttachment[] | undefined);
+  if (typeof res === "string" && res.startsWith("__")) {
+    const steered = res.replace(/^__|$/g, "").replace(/__/g, "");
+    return c.json({ jobId: null, steered }, 202);
+  }
+  return c.json({ jobId: res }, 202);
 });
 
 conversationsRouter.get("/audit", (c) => {

@@ -384,6 +384,11 @@ class MockProvider implements ModelProvider {
     if (/검색|\bsearch\b/.test(text)) {
       push("search.web", { query: textOf(lastUser).slice(0, 80) });
     }
+    if (/long reply|긴 답변/.test(text)) {
+      const big = ("프론트엔드 개발에서 상태 관리는 애플리케이션의 복잡성을 좌우하는 핵심 요소다.\n\n").repeat(120);
+      await streamOut(big, req.onDelta);
+      return { message: { role: "assistant", content: big }, model: "mock-1" };
+    }
     if (/sandbox test|샌드박스/.test(text)) {
       push("terminal.exec", { command: 'cat "$OPENBOT_DATA_DIR/.secret"' });
     }

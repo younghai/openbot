@@ -633,6 +633,49 @@ let fixProviderBotConv = "";
     `usage=${u.body.steered}/${Boolean(usageReply)} stop=${st.body.steered}/${Boolean(stopReply)}`);
 }
 
+// 17u. telegram long reply → ordered parts (re-arm gateway: 17s cleared the token)
+{
+  await api("/api/settings/credentials", { method: "PUT", body: JSON.stringify({ key: "TELEGRAM_BOT_TOKEN", value: "test-token" }) });
+  await new Promise((r) => setTimeout(r, 2000));
+  const sentBefore = fixture.tgSent.length;
+  fixture.tgQueue.push({ update_id: 9110, message: { chat: { id: 4242 }, from: { id: 4242 }, text: "long reply test" } });
+  const parts = await waitFor(async () => {
+    const marked = fixture.tgSent.slice(sentBefore).filter((m) => /\(\d+\/\d+\)/.test(String(m.text ?? "")));
+    return marked.length >= 2;
+  }, 60_000, "tg ordered parts");
+  const texts = fixture.tgSent.slice(sentBefore).map((m) => String(m.text ?? ""));
+  const allShort = texts.every((t) => t.length <= 3820);
+  record("telegram ordered reply split",
+    parts && allShort && texts.some((t) => t.includes("(1/")) && texts.some((t) => t.includes("(2/")),
+    `parts=${parts} sends=${texts.length} maxLen=${Math.max(...texts.map((t) => t.length))}`);
+}
+
+// 17v. auto conversation naming after first exchange
+{
+  const nb = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "Namer", emoji: "🏷" }) });
+  const s = await send(nb.body.conversationId, "내일 아침 회의 준비 어떻게 하지?");
+  const titled = await waitFor(async () => {
+    const boot = await api("/api/bootstrap");
+    const conv = (boot.body.conversations as any[]).find((c) => c.bot_id === nb.body.id);
+    return Boolean(conv?.title) && !String(conv?.title).startsWith("[mock:");
+  }, 20_000, "auto title");
+  const boot = await api("/api/bootstrap");
+  const conv = (boot.body.conversations as any[]).find((c) => c.bot_id === nb.body.id);
+  record("conversation auto-naming",
+    s.status === "done" && titled && conv?.title?.length > 0,
+    `title="${conv?.title ?? "none"}"`);
+}
+
+// 17w. context overflow → aggressive compaction + retry
+{
+  const s = await send(fixProviderBotConv, "overflow test");
+  const msgs = await messagesOf(fixProviderBotConv);
+  const reply = msgs.reverse().find((m) => m.role === "assistant" && m.content.includes("fixture-recovered"));
+  record("context overflow recovery",
+    s.status === "done" && Boolean(reply),
+    `job=${s.status} recovered=${Boolean(reply)}`);
+}
+
 // 18. composio without key → clear error
 {
   const r = await api("/api/tool-sources", { method: "POST", body: JSON.stringify({ name: "comp", kind: "composio" }) });

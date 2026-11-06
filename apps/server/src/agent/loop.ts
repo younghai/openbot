@@ -182,13 +182,33 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
   const ctx: ToolContext = { bot, computer, conversationId: opts.conversationId ?? `ephemeral:${uid()}`, depth: opts.depth, visited: opts.visited };
   let toolCount = 0;
 
+  let overflowRetried = false;
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const res = await provider.chat({
-      messages,
-      tools,
-      onDelta: (text) => emit({ type: "delta", botId: bot.id, conversationId: opts.conversationId, text }),
-      onThinking: (chars) => emit({ type: "thinking", botId: bot.id, conversationId: opts.conversationId, chars }),
-    });
+    let res;
+    try {
+      res = await provider.chat({
+        messages,
+        tools,
+        onDelta: (text) => emit({ type: "delta", botId: bot.id, conversationId: opts.conversationId, text }),
+        onThinking: (chars) => emit({ type: "thinking", botId: bot.id, conversationId: opts.conversationId, chars }),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!overflowRetried && opts.conversationId && /context|too long|token limit|maximum.*length|prompt is too long/i.test(msg)) {
+        overflowRetried = true;
+        await maybeCompact(opts.conversationId, provider, true);
+        history = historyForProvider(opts.conversationId);
+        const summaryRows2 = db.prepare("SELECT content FROM messages WHERE conversation_id=? AND role='system' ORDER BY created_at").all(opts.conversationId) as { content: string }[];
+        const rebuilt = [
+          systemPromptFor(bot, computer, opts.personaOverride, focusText, convKind === "channel" ? "channel" : "dm"),
+          ...summaryRows2.map((r) => `Earlier conversation summary: ${r.content}`),
+        ].join("\n\n");
+        messages.length = 0;
+        messages.push({ role: "system", content: rebuilt }, ...history);
+        continue;
+      }
+      throw err;
+    }
     messages.push(res.message);
 
     if (!res.message.tool_calls || res.message.tool_calls.length === 0) {
@@ -239,11 +259,11 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
 }
 
 /** Replace the oldest ~70% of an over-long conversation with a model-generated summary. */
-async function maybeCompact(conversationId: string, provider: import("./providers.js").ModelProvider): Promise<void> {
+async function maybeCompact(conversationId: string, provider: import("./providers.js").ModelProvider, aggressive = false): Promise<void> {
   const rows = db.prepare("SELECT id, role, content, tool_name, tool_result FROM messages WHERE conversation_id=? AND role IN ('user','assistant','tool') ORDER BY created_at").all(conversationId) as { id: string; role: string; content: string; tool_name: string | null; tool_result: string | null }[];
   const totalChars = rows.reduce((sum, r) => sum + (r.content?.length ?? 0) + (r.role === "tool" ? (r.tool_result?.length ?? 0) : 0), 0);
-  if (totalChars < COMPACT_THRESHOLD_CHARS) return;
-  const cut = Math.floor(rows.length * 0.7);
+  if (!aggressive && totalChars < COMPACT_THRESHOLD_CHARS) return;
+  const cut = Math.floor(rows.length * (aggressive ? 0.5 : 0.7));
   const older = rows.slice(0, cut);
   if (older.length === 0) return;
   const transcript = older
@@ -276,6 +296,35 @@ async function maybeCompact(conversationId: string, provider: import("./provider
     db.prepare("INSERT INTO memories (id, bot_id, content, created_at) VALUES (?,?,?,?)").run(
       uid(), botRow.bot_id, `Conversation summary: ${summary.slice(0, 2000)}`, now()
     );
+  }
+}
+
+
+/** Auto-title a DM after its first exchange (CopilotKit #997 pattern: a tool-less mini turn). */
+export async function maybeNameConversation(conversationId: string): Promise<void> {
+  try {
+    const conv = db.prepare("SELECT * FROM conversations WHERE id=?").get(conversationId) as { kind: string; title: string | null; bot_id: string | null } | undefined;
+    if (!conv || conv.kind !== "dm" || conv.title || !conv.bot_id) return;
+    const rows = db.prepare("SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') AND content != '' ORDER BY created_at LIMIT 2").all(conversationId) as { role: string; content: string }[];
+    if (rows.length < 2) return;
+    const bot = getBot(conv.bot_id);
+    if (!bot) return;
+    const provider = providerForRow(getProviderForBot(bot));
+    const res = await provider.chat({
+      messages: [
+        { role: "system", content: "다음 대화의 주제를 한국어 명사구 한 개로 요약해 제목만 출력한다. 16자 이내, 따옴표·마침표 없이, 다른 설명 금지." },
+        { role: "user", content: rows.map((r) => `${r.role === "user" ? "사용자" : "봇"}: ${r.content.slice(0, 300)}`).join("\n") },
+      ],
+      tools: [],
+    });
+    let title = textContent(res.message.content).replace(/["'."]/g, "").trim().slice(0, 24);
+    if (!title || title.startsWith("[mock:")) title = rows[0].content.slice(0, 20).trim();
+    if (!title) return;
+    db.prepare("UPDATE conversations SET title=? WHERE id=?").run(title, conversationId);
+    const { broadcast } = await import("../events.js");
+    broadcast({ type: "conversation.renamed", conversationId, title });
+  } catch {
+    // naming is best-effort
   }
 }
 

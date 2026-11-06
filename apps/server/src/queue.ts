@@ -34,7 +34,28 @@ export async function kickQueue(): Promise<void> {
   }
 }
 
+const JOB_TIMEOUT_MS = Number(process.env.OPENBOT_JOB_TIMEOUT_MS ?? 30 * 60_000);
+
 async function runJob(jobId: string): Promise<void> {
+  await Promise.race([runJobInner(jobId), watchdog(jobId)]);
+}
+
+/** A job that exceeds the watchdog is marked error — no more silent hangs (QwenPaw #8571 spirit). */
+function watchdog(jobId: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const job = jobById(jobId);
+      if (job && job.status === "running") {
+        db.prepare("UPDATE queue_jobs SET status='error', result=?, finished_at=? WHERE id=? AND status='running'").run(`watchdog: ${JOB_TIMEOUT_MS / 60000}분 초과`, now(), jobId);
+        broadcast({ type: "chat.error", jobId, conversationId: job.conversation_id, error: "watchdog: 작업 시간 초과" });
+        broadcast({ type: "queue.update", job: jobById(jobId) });
+      }
+      resolve();
+    }, JOB_TIMEOUT_MS).unref?.();
+  });
+}
+
+async function runJobInner(jobId: string): Promise<void> {
   const job = jobById(jobId);
   if (!job || job.status !== "pending") return;
   db.prepare("UPDATE queue_jobs SET status='running' WHERE id=?").run(jobId);
@@ -71,6 +92,7 @@ async function runJob(jobId: string): Promise<void> {
     }
     db.prepare("UPDATE queue_jobs SET status='done', result=?, finished_at=? WHERE id=?").run("", now(), jobId);
     if (job.source === "routine") db.prepare("UPDATE routines SET failure_count=0 WHERE bot_id=?").run(job.bot_id);
+    void import("./agent/loop.js").then((m) => m.maybeNameConversation(job.conversation_id));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     db.prepare("UPDATE queue_jobs SET status='error', result=?, finished_at=? WHERE id=?").run(msg, now(), jobId);

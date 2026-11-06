@@ -22,6 +22,7 @@ export interface FixtureCalls {
 
 export function startFixtures(): Promise<{ server: http.Server; port: number; calls: FixtureCalls; stdioScript: string }> {
   const calls: FixtureCalls = { chat: [], mcp: [], pets: 0, tgSent: [] };
+  let overflowFired = false;
   const tgQueue: Record<string, unknown>[] = [];
   const stdioScript = writeStdioMcpFixture();
 
@@ -67,6 +68,14 @@ export function startFixtures(): Promise<{ server: http.Server; port: number; ca
             content: null,
             tool_calls: [{ id: id(), type: "function", function: { name: `mcp.mcpsrc.echo`, arguments: JSON.stringify({ text: "hello-mcp" }) } }],
           });
+        }
+        if (text.includes("overflow test")) {
+          if (!overflowFired) {
+            overflowFired = true;
+            res.writeHead(400, { "content-type": "application/json" });
+            return res.end(JSON.stringify({ error: { message: "prompt is too long: maximum context window exceeded (fixture test)" } }));
+          }
+          return respond({ role: "assistant", content: "fixture-recovered: 오버플로 복구 성공" });
         }
         if (text.includes("injection test")) {
           return respond({

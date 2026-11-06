@@ -34,6 +34,22 @@ function userAllowed(id: number | undefined): boolean {
 }
 
 const chatBinds = new Map<number, string>(); // telegram chat id -> bot id
+
+/** Split long text into ordered parts at line/word boundaries. */
+function splitOrdered(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
+  const parts: string[] = [];
+  let rest = text;
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf("\n", max);
+    if (cut < max * 0.5) cut = rest.lastIndexOf(" ", max);
+    if (cut < max * 0.5) cut = max;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^\n/, "");
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
 const lastIncomingByChat = new Map<number, number>();
 let running = false;
 let offset = 0;
@@ -111,7 +127,15 @@ function wireOutbound(): void {
       for (const [chatId, botId] of chatBinds) {
         const conv = getOrCreateDmConversation(botId);
         if (e.conversationId === conv.id && e.botId === botId) {
-          void tg("sendMessage", { chat_id: chatId, text: (e.content as string).slice(0, 3800) }).catch(() => undefined);
+          // ordered parts instead of a hard truncation (rakazo outbox pattern)
+          const parts = splitOrdered((e.content as string), 3800);
+          void (async () => {
+            for (let i = 0; i < parts.length; i++) {
+              const text = parts.length > 1 ? `${parts[i]}
+(${i + 1}/${parts.length})` : parts[i];
+              await tg("sendMessage", { chat_id: chatId, text }).catch(() => undefined);
+            }
+          })();
           const lastIncoming = lastIncomingByChat.get(chatId);
           if (lastIncoming) void tg("setMessageReaction", { chat_id: chatId, message_id: lastIncoming, emoji: "\ud83d\udc4c" }).catch(() => undefined);
         }

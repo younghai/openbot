@@ -115,3 +115,9 @@ OpenAI 호환 provider는 SSE 스트리밍으로 응답하며(비스트리밍 �
 - 인젝션 게이트: 외부 도구 결과에 `_contentBoundary` 상시, 지시문 패턴 시 `_injectionFlagged`·`_injectionWhy[]` 추가(모양 보존).
 - `POST /api/conversations/:id/messages` 응답 확장: 스티어링 단어 처리 시 `{jobId: null, steered: "steered_stop"|"steered_usage"|"steered_mute"|"steered_unmute"}`. WS 이벤트 `chat.steered`.
 - 로컬 터미널은 sandbox-exec denylist 하에 실행(해제 `OPENBOT_DISABLE_SANDBOX=1`). 텔레그램 `TELEGRAM_ALLOWED_USERS` 자격증명으로 사용자 제한.
+
+## Stability & UX (2026-11-05~06)
+
+- WS 이벤트 추가: `conversation.renamed {conversationId, title}` — 첫 교환 후 자동 제목.
+- 컨텍스트 오버플로 복구: 모델 컨텍스트 초과 에러 시 강제 압축(50%) 후 1회 재시도. `OPENBOT_JOB_TIMEOUT_MS`(기본 30분) 와치독으로 조용한 hang 차단.
+- 텔레그램: 3800자 초과 답변을 줄바꿈 경계에서 분할, `(n/m)` 순서 마커 부착.

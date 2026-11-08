@@ -57,6 +57,12 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 - stdio 트랜스포트 지원: `transport:"stdio"` + `command/args`(라인 구분 JSON-RPC, 자식프로세스 수명·재시작 관리, 서버 종료 시 정리)
 - filesystem 공식 서버는 `data/computers/` 로 스코프(모든 컴퓨터 디렉터리; 봇별 스코프는 2차). memory는 `data/mcp-memory.json`에 영속.
 - 카탈로그도 데이터(`tool-catalog.ts`) — 2차에 커뮤니티 카탈로그(원격 JSON)로 확장.
+### Electron 데스크톱 셸 (2026-11-09, P2-F)
+
+- `apps/desktop/` — 최소 Electron 셸: 서버를 자식 프로세스로 기동(15초 대기) → BrowserWindow(localhost:8940) → 트레이 상주(숨김/보이기·서버 재시작·종료). macOS hiddenInset 타이틀바·다크 배경.
+- 실행: `cd apps/desktop && npm install && npm start` (Electron ~200MB 다운로드 필요)
+- 외부 링크는 기본 브라우저에서 열림. 창을 닫아도 트레이에 상주(macOS), Quit로 완전 종료.
+
 ### 팀 공유·채널 고도화·지출 상한·음성 승인 (2026-11-08, OpenMausBot 패턴)
 
 - **팀 공유·이식** — `GET /api/teams/export`가 전체 봇(페르소나·이모지)·채널(멤버·지시문)·루틴을 Markdown+YAML frontmatter로 내보냄. `POST /api/teams/import`로 리뷰(dryRun) 후 원클릭 설치. 시크릿 자동 제거. 커뮤니티 생태계의 씨앗.

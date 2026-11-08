@@ -2,23 +2,10 @@
   "name": "@openbot/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenBot desktop shell — spawns the server, opens a BrowserWindow at localhost:8940, tray icon",
-  "main": "main.js",
+  "description": "OpenBot desktop shell — Tauri v2 (Rust). Spawns the server, opens a system WebView.",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "build:mac": "electron-builder --mac --arm64",
-    "build:win": "electron-builder --win --x64"
-  },
-  "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
-  },
-  "build": {
-    "appId": "com.openbot.desktop",
-    "productName": "OpenBot",
-    "mac": { "category": "public.app-category.productivity", "target": ["dmg", "zip"] },
-    "win": { "target": ["nsis"] },
-    "files": ["main.js", "preload.js", "renderer/**"]
+    "tauri": "tauri",
+    "build": "cd src-tauri && cargo build --release",
+    "dev": "cd src-tauri && cargo run"
   }
 }

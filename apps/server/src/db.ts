@@ -199,6 +199,20 @@ CREATE TABLE IF NOT EXISTS approvals (
 try { db.exec("ALTER TABLE conversations ADD COLUMN muted INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'dm'"); } catch { /* exists */ }
 
+
+try { db.exec("ALTER TABLE conversations ADD COLUMN instructions TEXT"); } catch { }
+try { db.exec("ALTER TABLE conversations ADD COLUMN responder_mode TEXT NOT NULL DEFAULT 'all'"); } catch { }
+try { db.exec("ALTER TABLE channel_members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"); } catch { }
+try { db.exec("ALTER TABLE routines ADD COLUMN enabled2 INTEGER"); } catch { }
+CREATE_TABLE_IF_NOT_EXISTS_usage_caps: {
+  db.exec(`CREATE TABLE IF NOT EXISTS usage_caps (
+    bot_id TEXT PRIMARY KEY,
+    daily_token_cap INTEGER,
+    monthly_token_cap INTEGER,
+    enabled INTEGER NOT NULL DEFAULT 0
+  )`);
+}
+
 export const uid = (): string => crypto.randomUUID();
 export const now = (): number => Date.now();
 

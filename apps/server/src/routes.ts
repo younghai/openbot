@@ -8,6 +8,7 @@ import { routinesRouter } from "./routes/routines.js";
 import { platformRouter } from "./routes/platform.js";
 import { tasksRouter } from "./routes/tasks.js";
 import { filesRouter } from "./routes/files.js";
+import { teamsRouter } from "./routes/teams.js";
 
 export const api = new Hono();
 api.route("/", botsRouter);
@@ -18,4 +19,5 @@ api.route("/", sourcesRouter);
 api.route("/", routinesRouter);
 api.route("/", tasksRouter);
 api.route("/", filesRouter);
+api.route("/", teamsRouter);
 api.route("/", platformRouter);

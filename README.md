@@ -57,6 +57,14 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 - stdio 트랜스포트 지원: `transport:"stdio"` + `command/args`(라인 구분 JSON-RPC, 자식프로세스 수명·재시작 관리, 서버 종료 시 정리)
 - filesystem 공식 서버는 `data/computers/` 로 스코프(모든 컴퓨터 디렉터리; 봇별 스코프는 2차). memory는 `data/mcp-memory.json`에 영속.
 - 카탈로그도 데이터(`tool-catalog.ts`) — 2차에 커뮤니티 카탈로그(원격 JSON)로 확장.
+### 팀 공유·채널 고도화·지출 상한·음성 승인 (2026-11-08, OpenMausBot 패턴)
+
+- **팀 공유·이식** — `GET /api/teams/export`가 전체 봇(페르소나·이모지)·채널(멤버·지시문)·루틴을 Markdown+YAML frontmatter로 내보냄. `POST /api/teams/import`로 리뷰(dryRun) 후 원클릭 설치. 시크릿 자동 제거. 커뮤니티 생태계의 씨앗.
+- **채널 고도화** — 채널별 **공유 지시문**(프로젝트 룸 페르소나) + **리스폰더 모드**(`all` 순차 / `lead` 리드만 / `auto` 모델이 최적 응답자 선택). 채널을 "프로젝트 룸"으로 만듦.
+- **지출 상한** — `usage_caps` 테이블 + 봇별 월간 토큰 상한. 초과 시 잡이 error로 거부. `GET/PUT /api/usage-caps` CRUD.
+- **봇 복제** — `POST /api/bots/:id/duplicate`로 페르소나·이모지·TTS 복사(대화는 새로).
+- **음성 승인** — 통화 모드에서 승인 요청이 음성으로 물어보고("도구 X를 실행할까요?"), 음성 "하것음/아니것"으로 승인/거부.
+
 ### 안정성·UX 개선 (2026-11-05~06, 업스트림 업데이트 반영)
 
 - **컨텍스트 오버플로 복구** (QwenPaw #8571) — 모델이 "context window 초과"로 실패하면 강제 압축(50%) 후 컨텍스트 재구성해 **한 번 재시도**. 긴 대화 hang의 근본 처방.

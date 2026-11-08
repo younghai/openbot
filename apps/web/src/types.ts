@@ -209,6 +209,14 @@ export interface Task {
   completed_at: number | null;
 }
 
+export interface UsageCap {
+  bot_id: string;
+  bot_name: string | null;
+  daily_token_cap: number | null;
+  monthly_token_cap: number | null;
+  enabled: number;
+}
+
 export interface NotificationRow {
   id: string;
   kind: string;

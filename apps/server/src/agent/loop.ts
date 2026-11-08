@@ -154,9 +154,30 @@ function toolDefsFor(depth: number): ToolDef[] {
 }
 
 /** Run the agent loop to completion. Persists assistant/tool messages when conversationId is set. */
+
+/** Spend cap check: refuse to run when the bot is over its monthly token cap. */
+function checkSpendCap(botId: string): void {
+  const cap = db.prepare("SELECT * FROM usage_caps WHERE bot_id=? AND enabled=1").get(botId) as { monthly_token_cap: number | null } | undefined;
+  if (!cap?.monthly_token_cap) return;
+  const usage = db.prepare(
+    "SELECT meta FROM messages WHERE bot_id=? AND role='assistant' AND meta LIKE '%usage%' AND created_at > ?"
+  ).all(botId, Date.now() - 30 * 86_400_000) as { meta: string }[];
+  let monthly = 0;
+  for (const r of usage) {
+    try {
+      const m = JSON.parse(r.meta) as { usage?: { inputTokens?: number; outputTokens?: number } };
+      monthly += (m.usage?.inputTokens ?? 0) + (m.usage?.outputTokens ?? 0);
+    } catch { }
+  }
+  if (monthly > cap.monthly_token_cap) {
+    throw new Error("spend cap exceeded: monthly " + monthly + " / " + cap.monthly_token_cap + " tokens");
+  }
+}
+
 export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount: number }> {
   const bot = getBot(opts.botId);
   if (!bot) throw new Error(`bot ${opts.botId} not found`);
+  checkSpendCap(opts.botId);
   const computer = getComputerForBot(bot);
   const providerRow = getProviderForBot(bot);
   const provider = providerForRow(providerRow);

@@ -120,6 +120,10 @@ export function ChatView({
       }
       if (event.type === "approval.requested" && event.approval.conversation_id === conversationId) {
         setPendingApproval(event.approval);
+        // voice approval during call mode: ask out loud, listen for yes/no
+        if (callModeRef.current && event.approval) {
+          handleVoiceApproval(event.approval);
+        }
       }
       if (event.type === "approval.decided") {
         setPendingApproval((p) => (p && p.id === event.id ? null : p));
@@ -143,6 +147,35 @@ export function ChatView({
     () => boot.jobs.find((j) => j.conversation_id === conversationId && (j.status === "pending" || j.status === "running")),
     [boot.jobs, conversationId]
   );
+
+
+  async function handleVoiceApproval(approval: { id: string; tool: string }): Promise<void> {
+    const ask = `\ub3c4\uad6c ${approval.tool}\uc744 \uc2e4\ud589\ud560\uae4c\uc694? \uc74c\uc73c\ub85c \ub2f5\ud574\uc8fc\uc138\uc694. \ud5c8\uc6a9\uac19\uc73c\uba74 \ud558\uac83\uc74c, \uac70\ubd80\uac19\uc73c\uba74 \uc544\ub2c8\uac83\uc74c`;
+    speak(ask);
+    await new Promise((r) => setTimeout(r, Math.max(3000, ask.length * 100)));
+    const Ctor = getRecognition();
+    if (!Ctor) return;
+    const rec = new Ctor();
+    rec.lang = "ko-KR";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const said = e.results[0][0].transcript.toLowerCase();
+      const yes = /\uc74c|\ud558\uac83|\ud5c8\uc6a9|\uc608|\uace0|\uc624\ucf00|ok|yes|allow/.test(said);
+      const no = /\uc544\ub2c8|\uac70\ubd80|\ub188|\ub128|no|deny|stop/.test(said);
+      if (yes && !no) {
+        void api.approveTool(approval.id).catch(() => undefined);
+        speak("\uc2b9\uc778\ud588\uc2b5\ub2c8\ub2e4");
+      } else if (no) {
+        void api.denyTool(approval.id).catch(() => undefined);
+        speak("\uac70\ubd80\ud588\uc2b5\ub2c8\ub2e4");
+      } else {
+        speak("\uc798 \ubabb \uc54c\uc544\ub4e4\uc5c8\uc2b5\ub2c8\ub2e4. \ud654\uba74\uc5d0\uc11c \uacb0\uc815\ud574\uc8fc\uc138\uc694");
+      }
+    };
+    rec.start();
+    setTimeout(() => { try { rec.stop(); } catch { } }, 10000);
+  }
 
   async function send(text: string): Promise<void> {
     const content = text.trim();

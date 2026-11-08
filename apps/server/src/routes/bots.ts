@@ -62,3 +62,15 @@ botsRouter.delete("/memories/:id", (c) => {
   db.prepare("DELETE FROM memories WHERE id=?").run(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+botsRouter.post("/bots/:id/duplicate", (c) => {
+  const src = db.prepare("SELECT * FROM bots WHERE id=?").get(c.req.param("id")) as Record<string, unknown> | undefined;
+  if (!src) return c.json({ error: "bot not found" }, 404);
+  const id = uid();
+  const name = String(src.name) + " (\uc0ac\ubcf8)";
+  db.prepare("INSERT INTO bots (id, name, emoji, persona, tts_provider, status, created_at) VALUES (?,?,?,?,?,'active',?)").run(
+    id, name, String(src.emoji ?? "\ud83e\udd16"), String(src.persona ?? ""), String(src.tts_provider ?? "browser"), now()
+  );
+  const conv = getOrCreateDmConversation(id);
+  return c.json({ id, name, conversationId: conv.id }, 201);
+});

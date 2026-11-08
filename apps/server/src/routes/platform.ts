@@ -253,3 +253,20 @@ platformRouter.get("/stats", (c) => {
 
 platformRouter.get("/notifications", (c) => c.json(listNotifications(c.req.query("unread") === "1")));
 platformRouter.post("/notifications/read-all", (c) => c.json({ ok: true, marked: markAllRead() }));
+
+// ---------------------------------------------------------------- usage caps
+
+platformRouter.get("/usage-caps", (c) => {
+  const rows = db.prepare("SELECT uc.*, b.name as bot_name FROM usage_caps uc LEFT JOIN bots b ON b.id=uc.bot_id").all();
+  return c.json(rows);
+});
+
+platformRouter.put("/usage-caps/:botId", async (c) => {
+  const body = await c.req.json<{ dailyTokenCap?: number; monthlyTokenCap?: number; enabled?: boolean }>();
+  const botId = c.req.param("botId");
+  if (!db.prepare("SELECT 1 FROM bots WHERE id=?").get(botId)) return c.json({ error: "bot not found" }, 404);
+  db.prepare("INSERT INTO usage_caps (bot_id, daily_token_cap, monthly_token_cap, enabled) VALUES (?,?,?,?) ON CONFLICT(bot_id) DO UPDATE SET daily_token_cap=excluded.daily_token_cap, monthly_token_cap=excluded.monthly_token_cap, enabled=excluded.enabled").run(
+    botId, body.dailyTokenCap ?? null, body.monthlyTokenCap ?? null, body.enabled ? 1 : 0
+  );
+  return c.json({ ok: true });
+});

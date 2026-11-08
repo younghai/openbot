@@ -121,3 +121,11 @@ OpenAI 호환 provider는 SSE 스트리밍으로 응답하며(비스트리밍 �
 - WS 이벤트 추가: `conversation.renamed {conversationId, title}` — 첫 교환 후 자동 제목.
 - 컨텍스트 오버플로 복구: 모델 컨텍스트 초과 에러 시 강제 압축(50%) 후 1회 재시도. `OPENBOT_JOB_TIMEOUT_MS`(기본 30분) 와치독으로 조용한 hang 차단.
 - 텔레그램: 3800자 초과 답변을 줄바꿈 경계에서 분할, `(n/m)` 순서 마커 부착.
+
+## Team sharing + channel + caps (2026-11-08, OpenMausBot patterns)
+
+- `GET /api/teams/export` — 전체 봇·채널·루틴을 Markdown(YAML frontmatter)으로. 시크릿 자동 제거.
+- `POST /api/teams/import` — `{markdown, dryRun}`. dryRun=true면 preview만 반환. false면 봇/채널/루틴 생성.
+- `POST /api/bots/:id/duplicate` — 봇 복제(페르소나·이모지·TTS, 대화는 새로).
+- `GET /api/usage-caps` · `PUT /api/usage-caps/:botId` — 봇별 월간 토큰 상한(enabled 시 runAgent에서 거부).
+- 채널: `instructions`(공유 지시문)·`responder_mode`(all/lead/auto) 컬럼. auto는 로컬 모델 분류 턴으로 최적 응답자 선택.

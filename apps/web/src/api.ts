@@ -1,4 +1,4 @@
-import type { Approval, AuditRow, Bootstrap, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, SearchResults, Stats, Task, TtsProvider } from "./types";
+import type { Approval, AuditRow, Bootstrap, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -52,6 +52,16 @@ export const api = {
   stats: () => req<Stats>("/stats"),
   notifications: (unread = false) => req<NotificationRow[]>(`/notifications${unread ? "?unread=1" : ""}`),
   markNotificationsRead: () => req<{ ok: boolean; marked: number }>("/notifications/read-all", { method: "POST" }),
+  exportTeam: async (): Promise<string> => {
+    const res = await fetch("/api/teams/export");
+    return res.text();
+  },
+  importTeam: (markdown: string, dryRun = false) =>
+    req<{ preview?: unknown; imported?: { bots: number; channels: number; routines: number } }>("/teams/import", { method: "POST", body: JSON.stringify({ markdown, dryRun }) }),
+  duplicateBot: (id: string) => req<{ id: string; name: string; conversationId: string }>(`/bots/${id}/duplicate`, { method: "POST" }),
+  usageCaps: () => req<UsageCap[]>("/usage-caps"),
+  putUsageCap: (botId: string, body: { dailyTokenCap?: number; monthlyTokenCap?: number; enabled?: boolean }) =>
+    req<{ ok: boolean }>(`/usage-caps/${botId}`, { method: "PUT", body: JSON.stringify(body) }),
   backup: () => req<{ ok: boolean; file: string; bytes: number }>("/backup", { method: "POST" }),
   files: (scope: "memory" | "workspace", computerId?: string, botId?: string, path?: string) =>
     req<{ path: string; entries: FileEntry[] }>(`/files?scope=${scope}${computerId ? `&computerId=${computerId}` : ""}${botId ? `&botId=${botId}` : ""}${path ? `&path=${encodeURIComponent(path)}` : ""}`),

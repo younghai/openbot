@@ -55,6 +55,36 @@ function watchdog(jobId: string): Promise<void> {
   });
 }
 
+
+/** Pick the best responder for an un-mentioned channel message (OpenMausBot Jev pattern, local model). */
+async function pickAutoResponder(botIds: string[], prompt: string, channelInstructions: string): Promise<string[]> {
+  if (botIds.length <= 1) return botIds;
+  try {
+    const { getBot, getProviderForBot, historyForProvider } = await import("./agent/loop.js");
+    const { providerForRow, textContent } = await import("./agent/providers.js");
+    const roster = botIds.map((id) => {
+      const b = getBot(id);
+      return b ? `${b.name}: ${b.persona.slice(0, 80)}` : "?";
+    }).join("\n");
+    const provider = providerForRow(undefined); // default provider (local model)
+    const res = await provider.chat({
+      messages: [
+        { role: "system", content: `Pick the best bot to answer this message. Reply with ONLY the bot name, nothing else.\n\nBots:\n${roster}${channelInstructions ? `\nChannel context: ${channelInstructions.slice(0, 200)}` : ""}` },
+        { role: "user", content: prompt.slice(0, 300) },
+      ],
+      tools: [],
+    });
+    const pick = textContent(res.message.content).trim().toLowerCase();
+    const match = botIds.find((id) => {
+      const b = getBot(id);
+      return b && pick.includes(b.name.toLowerCase());
+    });
+    return match ? [match] : [botIds[0]];
+  } catch {
+    return [botIds[0]];
+  }
+}
+
 async function runJobInner(jobId: string): Promise<void> {
   const job = jobById(jobId);
   if (!job || job.status !== "pending") return;
@@ -65,19 +95,33 @@ async function runJobInner(jobId: string): Promise<void> {
     const conv = db.prepare("SELECT * FROM conversations WHERE id=?").get(job.conversation_id) as unknown as { kind: string } | undefined;
     if (!conv) throw new Error("conversation missing");
     if (conv.kind === "channel") {
-      const members = db.prepare("SELECT bot_id FROM channel_members WHERE conversation_id=?").all(job.conversation_id) as { bot_id: string }[];
-      for (const member of members) {
-        const bot = getBot(member.bot_id);
+      const convRow = db.prepare("SELECT responder_mode, instructions FROM conversations WHERE id=?").get(job.conversation_id) as { responder_mode: string | null; instructions: string | null } | undefined;
+      const mode = convRow?.responder_mode ?? "all";
+      const channelInstructions = convRow?.instructions ?? "";
+      const allMembers = db.prepare("SELECT bot_id, role FROM channel_members WHERE conversation_id=?").all(job.conversation_id) as { bot_id: string; role: string }[];
+      // responder rules: 'all' = sequential (default), 'lead' = first active member only, 'auto' = model picks one
+      let responders: string[];
+      if (mode === "lead") {
+        const lead = allMembers.find((m) => m.role === "lead") ?? allMembers[0];
+        responders = lead ? [lead.bot_id] : [];
+      } else if (mode === "auto") {
+        const active = allMembers.filter((m) => getBot(m.bot_id)?.status === "active").map((m) => m.bot_id);
+        responders = await pickAutoResponder(active, job.prompt, channelInstructions);
+      } else {
+        responders = allMembers.map((m) => m.bot_id);
+      }
+      for (const botId of responders) {
+        const bot = getBot(botId);
         if (!bot || bot.status !== "active") continue;
         const res = await runAgent({
-          botId: member.bot_id,
+          botId,
           conversationId: job.conversation_id,
           history: historyForProvider(job.conversation_id),
           depth: 0,
-          visited: [member.bot_id],
+          visited: [botId],
           jobId,
         });
-        broadcast({ type: "chat.message", conversationId: job.conversation_id, botId: member.bot_id, role: "assistant", content: res.text });
+        broadcast({ type: "chat.message", conversationId: job.conversation_id, botId, role: "assistant", content: res.text });
       }
     } else {
       const res = await runAgent({

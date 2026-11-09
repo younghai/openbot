@@ -57,6 +57,12 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 - stdio 트랜스포트 지원: `transport:"stdio"` + `command/args`(라인 구분 JSON-RPC, 자식프로세스 수명·재시작 관리, 서버 종료 시 정리)
 - filesystem 공식 서버는 `data/computers/` 로 스코프(모든 컴퓨터 디렉터리; 봇별 스코프는 2차). memory는 `data/mcp-memory.json`에 영속.
 - 카탈로그도 데이터(`tool-catalog.ts`) — 2차에 커뮤니티 카탈로그(원격 JSON)로 확장.
+### 봇 템플릿 (2026-11-09, n8n 패턴)
+
+- **"이 봇으로 뭘 할까?"에 한 번에 답** — 5종 목적별 프리셋: 📰 뉴스 브리핑(매일 아침 cron+search.web) · 🔬 리서처(검색+browser.fetch+출처) · 💻 코딩 파트너(작업장 정책+fs+terminal) · 📅 개인 비서(memory+아침 루틴) · 📊 데이터 분석가(CSV/JSON+통계).
+- 원클릭 생성(`POST /api/bot-templates/:id/create`): 페르소나+루틴+도구 정책+**첫 메시지 자동 발사**까지 한 번에. 마법사 1단계에서 템플릿 카드 선택.
+- 실측: 뉴스 브리핑 봇 생성 → 루틴 `0 8 * * 1-5` 확인 → 첫 메시지 "AI 뉴스 검색해줘" 잡 running 확인.
+
 ### Rust 데스크톱 셸 — Tauri v2 (2026-11-09, P2-F)
 
 - `apps/desktop/src-tauri/` — **Tauri v2 (Rust + 시스템 WebView)**: 서버를 자식 프로세스로 기동(15초 대기) → WebView 창(localhost:8940) → 트레이 상주(숨김/보이기·종료). Electron 대비 ~10MB (200MB → 10MB).

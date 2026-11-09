@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db, uid, now } from "../db.js";
 import { getOrCreateDmConversation } from "../agent/loop.js";
+import { BOT_TEMPLATES, type BotTemplate } from "../bot-templates.js";
 
 export const botsRouter = new Hono();
 
@@ -73,4 +74,39 @@ botsRouter.post("/bots/:id/duplicate", (c) => {
   );
   const conv = getOrCreateDmConversation(id);
   return c.json({ id, name, conversationId: conv.id }, 201);
+});
+
+// ---------------------------------------------------------------- bot templates (n8n pattern)
+
+botsRouter.get("/bot-templates", (c) => c.json(BOT_TEMPLATES));
+
+botsRouter.post("/bot-templates/:id/create", async (c) => {
+  const tpl = BOT_TEMPLATES.find((t) => t.id === c.req.param("id"));
+  if (!tpl) return c.json({ error: "template not found" }, 404);
+  const body = await c.req.json<{ name?: string }>().catch(() => ({ name: "" }));
+  const name = (body.name ?? "").trim() || tpl.title;
+  const id = uid();
+  db.prepare("INSERT INTO bots (id, name, emoji, persona, tts_provider, status, created_at) VALUES (?,?,?,?,?,'active',?)").run(
+    id, name, tpl.emoji, tpl.persona, "browser", now()
+  );
+  const conv = getOrCreateDmConversation(id);
+  // starter routines
+  for (const r of tpl.routines) {
+    try {
+      const { parseCron } = await import("../cron.js");
+      parseCron(r.cron);
+      db.prepare("INSERT INTO routines (id, bot_id, name, cron, prompt, enabled, failure_count, created_at) VALUES (?,?,?,?,?,1,0,?)").run(
+        uid(), id, r.name, r.cron, r.prompt, now()
+      );
+    } catch { /* bad cron: skip */ }
+  }
+  // apply tool policy preset
+  try {
+    const { applyPolicyPreset } = await import("../approvals.js");
+    applyPolicyPreset(tpl.policyPreset);
+  } catch { /* best-effort */ }
+  // send the first message so the bot immediately proves itself
+  const { enqueueFromHttp } = await import("../chat.js");
+  void enqueueFromHttp(conv.id, tpl.firstMessage);
+  return c.json({ id, conversationId: conv.id, name, template: tpl.id, routines: tpl.routines.length }, 201);
 });

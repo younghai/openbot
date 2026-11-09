@@ -209,6 +209,13 @@ export interface Task {
   completed_at: number | null;
 }
 
+export interface BotTemplateRoutine { name: string; cron: string; prompt: string }
+export interface BotTemplate {
+  id: string; icon: string; title: string; description: string; emoji: string;
+  persona: string; firstMessage: string; routines: BotTemplateRoutine[];
+  policyPreset: string;
+}
+
 export interface UsageCap {
   bot_id: string;
   bot_name: string | null;

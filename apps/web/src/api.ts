@@ -1,4 +1,4 @@
-import type { Approval, AuditRow, Bootstrap, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
+import type { Approval, AuditRow, Bootstrap, BotTemplate, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -52,6 +52,9 @@ export const api = {
   stats: () => req<Stats>("/stats"),
   notifications: (unread = false) => req<NotificationRow[]>(`/notifications${unread ? "?unread=1" : ""}`),
   markNotificationsRead: () => req<{ ok: boolean; marked: number }>("/notifications/read-all", { method: "POST" }),
+  botTemplates: () => req<BotTemplate[]>("/bot-templates"),
+  createFromTemplate: (templateId: string, name?: string) =>
+    req<{ id: string; conversationId: string; name: string; routines: number }>(`/bot-templates/${templateId}/create`, { method: "POST", body: JSON.stringify({ name }) }),
   exportTeam: async (): Promise<string> => {
     const res = await fetch("/api/teams/export");
     return res.text();

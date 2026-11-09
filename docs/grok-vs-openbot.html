@@ -115,7 +115,7 @@
   </div>
   <div class="card">
     <h3 style="margin-top:0">🟥 뒤처지는 축 (4)과 극복 경로</h3>
-    <p class="small">· <b>모델 품질</b> → BYO 키 즉시 해소 (경로 실측 완료)<br>· <b>채널</b> → Telegram 게이트웨이 2차 (승인 API 이미 준비됨)<br>· <b>접근성</b> → Electron 셸 (§4 dinobot 패턴)<br>· <b>확장</b> → 3차 멀티유저 (스키마는 추가 전용 설계)</p>
+    <p class="small">· <b>모델 품질</b> → BYO 키 즉시 해소 (경로 실측 완료)<br>· <b>채널</b> → Telegram 게이트웨이 2차 (승인 API 이미 준비됨)<br>· <b>접근성</b> → Tauri(Rust) 셸 (§4 dinobot 패턴)<br>· <b>확장</b> → 3차 멀티유저 (스키마는 추가 전용 설계)</p>
   </div>
 </div>
 <div class="method-note">
@@ -123,7 +123,7 @@
 </div>
 
 <h2>4. dinobot-desktop 조사 — 우리 2차 로드맵의 실증 사례</h2>
-<p>2026-10-31 조사. <code>dinobot-labs/dinobot-desktop</code>(Electron 클라이언트, 30★, 2026-10-19 생성)과 코어 <code>dinobot-labs/dinobot</code>(Bun 데몬+TUI)을 GitHub API로 구조 분석. <span class="badge warn">주의</span> <b>PolyForm Noncommercial 라이선스 — 코드 복사·포팅 불가, 패턴 참고만</b>.</p>
+<p>2026-10-31 조사. <code>dinobot-labs/dinobot-desktop</code>(Tauri(Rust) 클라이언트, 30★, 2026-10-19 생성)과 코어 <code>dinobot-labs/dinobot</code>(Bun 데몬+TUI)을 GitHub API로 구조 분석. <span class="badge warn">주의</span> <b>PolyForm Noncommercial 라이선스 — 코드 복사·포팅 불가, 패턴 참고만</b>.</p>
 <div class="grid2">
   <div class="card">
     <h3 style="margin-top:0">코어에서 발견한 패턴 (구조 실측)</h3>
@@ -135,7 +135,7 @@
   </div>
   <div class="card">
     <h3 style="margin-top:0">데스크톱에서 발견한 패턴</h3>
-    <p class="small">· 얇은 Electron 셸이 <b>로컬 데몬을 확보·기동·동반 재시작</b>(daemon-ensure/process)<br>
+    <p class="small">· 얇은 Rust(Tauri) 셸이 <b>로컬 데몬을 확보·기동·동반 재시작</b>(daemon-ensure/process)<br>
     · 브라우저 컨트롤러(프로세스·신뢰·검증 분리)<br>
     · 아티팩트·첨부·클립보드·이미지 파이프라인<br>
     · 스타일가이드+공유 UI 킷(재사용 컴포넌트 회귀)</p>
@@ -145,7 +145,7 @@
 <table>
   <tr><th>#</th><th>제안</th><th>우리 자산과의 접점</th><th>시기</th></tr>
   <tr><td>1</td><td><b>Telegram 채널 + 인라인 승인 버튼</b> (ask-buttons 패턴)</td><td>승인 큐 REST/WS API가 이미 완성 — 텔레그램 버튼→<code>/approvals/:id/approve</code> 매핑만 추가. dinobot이 채널 원격승인 UX를 증명</td><td>2차 1순위</td></tr>
-  <tr><td>2</td><td><b>Electron 데스크톱 셸</b> (데몬 동반 기동·트레이·자동업데이트)</td><td>서버가 이미 웹 UI 내장 — 셸은 창+데몬 수명관리만. rakazo·dinobot 동일 아키텍처로 검증된 패턴</td><td>2차</td></tr>
+  <tr><td>2</td><td><b>Tauri(Rust) 데스크톱 셸</b> (데몬 동반 기동·트레이·자동업데이트)</td><td>서버가 이미 웹 UI 내장 — 셸은 창+데몬 수명관리만. rakazo·dinobot 동일 아키텍처로 검증된 패턴</td><td>2차</td></tr>
   <tr><td>3</td><td><b>모델 키 풀·로테이션·일일 예산</b></td><td>자격증명 금고(AES-GCM)에 pool/rotation/budget 시맨틱 추가 — BYO 호스티드 모델 병행 시 비용 방어선</td><td>2차</td></tr>
   <tr><td>4</td><td><b>채팅 첨부·아티팩트 파이프라인</b></td><td>미디어 서빙(/api/media)·메시지 첨부 메타는 이미 있음 — 사용자 파일 첨부→봇 컨텍스트 전달만 연결</td><td>2차</td></tr>
   <tr><td>5</td><td>캘린더/플래너 · 스킬 진화 · codemode 샌드박스</td><td>루틴(cron)·스킬 파일 자산 위에 확장 — dinobot이 가치를 증명했지만 규모가 큼</td><td>3차 검토</td></tr>
@@ -153,7 +153,7 @@
 
 <h2>5. 결론</h2>
 <div class="card">
-  <p><b>Grok Bot = 100 기준 68.</b> 그러나 이 숫자보다 중요한 구조: 지는 축(모델·채널·접근성·확장)은 <b>전부 로드맵으로 지워지는 것들</b>(BYO 키, Telegram 2차, Electron, 3차 멀티유저)이고, 이기는 축(주권·통제·개방성·비용)은 <b>클라우드 제품이 구조적으로 따라올 수 없는 것들</b>이다. 1차 목표였던 "로컬에서 진짜 써보기"는 31/31 매트릭스와 실물 E2E로 닫혔고, 2차의 최단 승부처는 Telegram+승인버튼 — 우리 승인 API는 이미 그 버튼을 기다리고 있다.</p>
+  <p><b>Grok Bot = 100 기준 68.</b> 그러나 이 숫자보다 중요한 구조: 지는 축(모델·채널·접근성·확장)은 <b>전부 로드맵으로 지워지는 것들</b>(BYO 키, Telegram 2차, Tauri, 3차 멀티유저)이고, 이기는 축(주권·통제·개방성·비용)은 <b>클라우드 제품이 구조적으로 따라올 수 없는 것들</b>이다. 1차 목표였던 "로컬에서 진짜 써보기"는 31/31 매트릭스와 실물 E2E로 닫혔고, 2차의 최단 승부처는 Telegram+승인버튼 — 우리 승인 API는 이미 그 버튼을 기다리고 있다.</p>
 </div>
 
 <footer>

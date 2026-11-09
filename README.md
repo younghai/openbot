@@ -161,7 +161,7 @@ docs/API.md  REST + WebSocket 계약
 
 1. 음성 키 넣고 실제 TTS/Whisper 실측 (설정 → 음성 & 키)
 2. 다중 사용자 인증(현재 로컬 단일 사용자 전용 — LAN 노출 시 주의)
-3. Electron/모바일 클라이언트(rakazo처럼 같은 API 재사용)
+3. Tauri(Rust)/모바일 클라이언트(rakazo처럼 같은 API 재사용)
 
 ## 설계 결정 요약
 

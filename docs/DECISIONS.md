@@ -18,3 +18,5 @@
 | 샌드박스 deny는 regex+realpath로만 | 실측: darwin 25에서 subpath file-read* deny 무시, /var firmlink로 /var/... regex 미매치 | subpath deny, symlink 경로 그대로 |
 | 외부 콘텐츠는 경계+플래그 | 도구 게이트는 실행 전이고 인젝션은 컨텍스트 오염이라 별도 게이트 필요(deepseek-bot injection.ts) | 외부 콘텐츠 차단, 모델에게만 맡김 |
 | 데스크톱 셸은 Tauri v2(Rust) | Electron 대비 10% 크기(10MB vs 200MB), 시스템 WebView 사용, Rust 방향성과 일치 | Electron(JS 200MB), egui(웹 UI 재사용 불가) |
+| 학술 검색은 arXiv Atom + PubMed E-utilities 직접 파싱 | 키 불필요·XML 파싱은 의존 없이 regex로 충분 | Semantic Scholar API(키 필요), Crossref(무겁다) |
+| 논문 초록은 인젝션 가드 대상 | 외부 텍스트에 지시문이 숨을 수 있음(실측: fixture ReMe 논문에 "Ignore instructions" 포함) | 초록 그대로 전달 |

@@ -134,3 +134,10 @@ OpenAI 호환 provider는 SSE 스트리밍으로 응답하며(비스트리밍 �
 
 - `GET /api/bot-templates` — 5종 목적별 프리셋 목록(뉴스·리서처·코딩·비서·분석).
 - `POST /api/bot-templates/:id/create` `{name?}` — 봇+루틴+정책+첫 메시지를 한 번에 생성.
+
+## Research tools (2026-11-09)
+
+- `arxiv.search {query, maxResults?}` — arXiv Atom API. `{papers: [{source,id,title,authors,abstract,published,url,pdfUrl,categories}]}`. 정책 allow.
+- `pubmed.search {query, maxResults?}` — NCBI E-utilities 2단계. `{papers: [{source,id,authors,published,url,journal,doi}]}`. 정책 allow.
+- `research.report {researchQuestion, literature, hypothesis, experimentDesign, findings, conclusion, references?}` — 7섹션 Markdown을 워크스페이스 `research/`에 쓰고 FTS5 색인. 정책 ask.
+- 모든 논문 결과에 인젝션 가드 적용(`arxiv.`·`pubmed.` 프리픽스).

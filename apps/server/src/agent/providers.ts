@@ -384,6 +384,22 @@ class MockProvider implements ModelProvider {
     if (/검색|\bsearch\b/.test(text)) {
       push("search.web", { query: textOf(lastUser).slice(0, 80) });
     }
+    if (/pubmed|medical|biomedical/.test(text)) {
+      push("pubmed.search", { query: "LLM clinical decision support", maxResults: 5 });
+    } else if (/arxiv|paper|논문/.test(text)) {
+      push("arxiv.search", { query: "LLM agent memory", maxResults: 5 });
+    }
+    if (/research report|보고서/.test(text)) {
+      push("research.report", {
+        researchQuestion: "What are the most effective memory architectures for LLM agents?",
+        literature: "Chen et al. (2026) survey episodic/semantic/working memory. Park & Wang (2026) introduce ReMe.",
+        hypothesis: "Markdown-based knowledge bases outperform vector-only RAG for personal recall.",
+        experimentDesign: "Compare ReMe vs baseline RAG on 100 personal recall tasks.",
+        findings: "ReMe achieved 34% improvement in recall accuracy.",
+        conclusion: "Structured Markdown memory is superior for personal assistant contexts.",
+        references: ["Chen et al. https://arxiv.org/abs/2601.12345", "Park & Wang https://arxiv.org/abs/2602.67890"],
+      });
+    }
     if (/long reply|긴 답변/.test(text)) {
       const big = ("프론트엔드 개발에서 상태 관리는 애플리케이션의 복잡성을 좌우하는 핵심 요소다.\n\n").repeat(120);
       await streamOut(big, req.onDelta);

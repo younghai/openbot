@@ -57,6 +57,15 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 - stdio 트랜스포트 지원: `transport:"stdio"` + `command/args`(라인 구분 JSON-RPC, 자식프로세스 수명·재시작 관리, 서버 종료 시 정리)
 - filesystem 공식 서버는 `data/computers/` 로 스코프(모든 컴퓨터 디렉터리; 봇별 스코프는 2차). memory는 `data/mcp-memory.json`에 영속.
 - 카탈로그도 데이터(`tool-catalog.ts`) — 2차에 커뮤니티 카탈로그(원격 JSON)로 확장.
+### 학술 논문 검색·연구 파이프라인 (2026-11-09, OpenResearch 패턴)
+
+- **arXiv 검색** `arxiv.search` — 키 없는 arXiv Atom API. 논문 제목·저자·초록·PDF 링크·카테고리 반환. 정책 allow.
+- **PubMed 검색** `pubmed.search` — 키 없는 NCBI E-utilities 2단계(esearch→esummary). PMID·저자·저널·DOI 반환. 정책 allow.
+- **연구 보고서** `research.report` — 7개 섹션(Research Question/Literature Review/Hypothesis/Experiment Design/Findings/Conclusion/References) Markdown 생성 → 워크스페이스 `research/`에 저장 → FTS5 지식 색인. 정책 ask(승인 후 생성).
+- **리서처 템플릿 5단계 파이프라인**: ①문헌 조사(arxiv/pubmed/search.web) ②가설 수립 ③실험 설계 ④결과 해석 ⑤보고서 생성. OpenResearch의 hypothesis→experiment→conclusion 패턴.
+- 논문 초록은 외부 콘텐츠 — 인젝션 가드가 경계 표시 + 지시문 플래그.
+- 실측: 매트릭스 53/54(arXiv ✓ PubMed ✓ 보고서 ✓ — DDG 외부 1건만 실패).
+
 ### 채널 확장·상시 대기·RAG·지갑 (2026-11-09, 상용 제품 대비)
 
 - **VPS 배포** — `docker-compose.yml` + `docs/deploy-vps.md`: $5/월 VPS에서 24/7 상시 대기. Docker 볼륨으로 데이터 영속. 로컬 대기는 launchd/caffeinate 가이드 포함.

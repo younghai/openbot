@@ -45,7 +45,7 @@ async function startServer(): Promise<void> {
   const tsxBin = path.resolve(here, "../../node_modules/.bin/tsx");
   server = spawn(tsxBin, [path.join(here, "..", "index.ts")], {
     cwd: here,
-    env: { ...process.env, OPENBOT_PORT: String(PORT), OPENBOT_HOST: "127.0.0.1", OPENBOT_DATA_DIR: dataDir, TELEGRAM_API_BASE: `http://127.0.0.1:${fixture.port}/tg` },
+    env: { ...process.env, OPENBOT_PORT: String(PORT), OPENBOT_HOST: "127.0.0.1", OPENBOT_DATA_DIR: dataDir, TELEGRAM_API_BASE: `http://127.0.0.1:${fixture.port}/tg`, OPENBOT_ARXIV_API_BASE: `http://127.0.0.1:${fixture.port}/arxiv/api/query`, OPENBOT_PUBMED_API_BASE: `http://127.0.0.1:${fixture.port}/pubmed/entrez/eutils` },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
@@ -674,6 +674,48 @@ let fixProviderBotConv = "";
   record("context overflow recovery",
     s.status === "done" && Boolean(reply),
     `job=${s.status} recovered=${Boolean(reply)}`);
+}
+
+// 17r. arXiv search: fixture, normalized metadata, injection guard
+{
+  const g = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "Scholar", emoji: "🎓" }) });
+  const s = await send(g.body.conversationId, "arxiv paper 논문 search 해줘");
+  const msgs = await messagesOf(g.body.conversationId);
+  const toolMsg = msgs.reverse().find((m) => m.role === "tool" && m.tool_name === "arxiv.search");
+  const result = toolMsg ? JSON.parse(toolMsg.tool_result) : null;
+  const paper = result?.papers?.[0];
+  record("arXiv search (fixture + injection guard)",
+    s.status === "done" && Boolean(paper?.title) && paper.authors?.length >= 2 && paper.url?.startsWith("https://arxiv.org/abs/")
+    && Boolean(result?._contentBoundary),
+    `papers=${result?.papers?.length ?? 0} first="${paper?.title?.slice(0, 50) ?? ""}" boundary=${Boolean(result?._contentBoundary)}`);
+}
+
+// 17s. PubMed search: two-step esearch+esummary fixture
+{
+  const g = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "BioScholar", emoji: "🧬" }) });
+  const s = await send(g.body.conversationId, "pubmed medical search 해줘");
+  const msgs = await messagesOf(g.body.conversationId);
+  const toolMsg = msgs.reverse().find((m) => m.role === "tool" && m.tool_name === "pubmed.search");
+  const result = toolMsg ? JSON.parse(toolMsg.tool_result) : null;
+  const paper = result?.papers?.[0];
+  record("PubMed search (fixture, 2-step esearch+esummary)",
+    s.status === "done" && Boolean(paper?.title) && paper.url?.includes("pubmed.ncbi.nlm.nih.gov") && Boolean(paper.journal),
+    `papers=${result?.papers?.length ?? 0} first="${paper?.title?.slice(0, 50) ?? ""}" journal="${paper?.journal ?? ""}"`);
+}
+
+// 17t. research.report: structured Markdown + knowledge indexing
+{
+  const g = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "Reporter", emoji: "📝" }) });
+  const s = await send(g.body.conversationId, "research report 보고서");
+  const msgs = await messagesOf(g.body.conversationId);
+  const toolMsg = msgs.reverse().find((m) => m.role === "tool" && m.tool_name === "research.report");
+  const result = toolMsg ? JSON.parse(toolMsg.tool_result) : null;
+  const hasSections = result?.ok === true && result.sections === 7 && result.chunksIndexed > 0;
+  const indexed = await api(`/api/knowledge?botId=${g.body.id}`);
+  const hasKnowledge = (indexed.body?.documents ?? []).length > 0;
+  record("research report (structured Markdown + FTS indexing)",
+    s.status === "done" && hasSections && hasKnowledge,
+    `file=${result?.filename ?? "none"} chunks=${result?.chunksIndexed ?? 0} knowledge=${hasKnowledge}`);
 }
 
 // 18. composio without key → clear error

@@ -10,6 +10,7 @@ import "../tools/desktop-native.js"; // registers native desktop computer-use (o
 import { setDelegationRunner } from "../tools/core.js";
 import { listDynamicTools } from "../tools/dynamic.js";
 import { guardExternal } from "../injection.js";
+import { knowledgeContext } from "../knowledge.js";
 import { listSkills } from "../tools/core.js";
 import { broadcast } from "../events.js";
 
@@ -131,6 +132,8 @@ function systemPromptFor(bot: BotRow, computer: ComputerRow, personaOverride?: s
     for (const m of memories) lines.push(`- ${m.content}`);
   }
   const openTasks = db.prepare("SELECT id, title, status FROM tasks WHERE assignee_bot_id=? AND status!='done' ORDER BY updated_at DESC LIMIT 10").all(bot.id) as { id: string; title: string; status: string }[];
+  const knowledge = knowledgeContext(bot.id, focusText);
+  if (knowledge) lines.push(knowledge);
   if (openTasks.length > 0) {
     lines.push("Your assigned tasks (report progress with the task.update tool):");
     for (const t of openTasks) lines.push(`- [${t.id.slice(0, 8)}] ${t.title} (${t.status})`);

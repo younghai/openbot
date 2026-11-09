@@ -57,6 +57,16 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 - stdio 트랜스포트 지원: `transport:"stdio"` + `command/args`(라인 구분 JSON-RPC, 자식프로세스 수명·재시작 관리, 서버 종료 시 정리)
 - filesystem 공식 서버는 `data/computers/` 로 스코프(모든 컴퓨터 디렉터리; 봇별 스코프는 2차). memory는 `data/mcp-memory.json`에 영속.
 - 카탈로그도 데이터(`tool-catalog.ts`) — 2차에 커뮤니티 카탈로그(원격 JSON)로 확장.
+### 채널 확장·상시 대기·RAG·지갑 (2026-11-09, 상용 제품 대비)
+
+- **VPS 배포** — `docker-compose.yml` + `docs/deploy-vps.md`: $5/월 VPS에서 24/7 상시 대기. Docker 볼륨으로 데이터 영속. 로컬 대기는 launchd/caffeinate 가이드 포함.
+- **Discord 채널** — WebSocket Gateway로 메시지 수신, **인터랙션 버튼으로 원격 승인**. `DISCORD_BOT_TOKEN` 자격증명 저장 시 자동 시작.
+- **Slack 채널** — Socket Mode 패턴, **Block Actions 버튼으로 원격 승인**. `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN`.
+- **이메일 도구** — `email.send`(SMTP 발송) · `email.status`(설정 확인). SMTP_HOST/PORT/USER/PASS 자격증명.
+- **전화·SMS** — `phone.sms` · `phone.call`(TwiML 음성) · `phone.status`. Twilio API, 승인 큐 연동.
+- **지갑** — `payment.send`(Stripe PaymentIntent) · `payment.status`. 승인 큐로 "이 결제를 승인하시겠습니까?" 확인 후 실행.
+- **RAG 지식베이스** — `knowledge.index`(문서 색인) · `knowledge.search`(FTS5 검색) · `knowledge.list`. 문서 청킹→SQLite FTS5→시스템 프롬프트에 관련 청크 주입.
+
 ### 봇 템플릿 (2026-11-09, n8n 패턴)
 
 - **"이 봇으로 뭘 할까?"에 한 번에 답** — 5종 목적별 프리셋: 📰 뉴스 브리핑(매일 아침 cron+search.web) · 🔬 리서처(검색+browser.fetch+출처) · 💻 코딩 파트너(작업장 정책+fs+terminal) · 📅 개인 비서(memory+아침 루틴) · 📊 데이터 분석가(CSV/JSON+통계).

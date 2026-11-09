@@ -30,7 +30,7 @@ const KEY_FOR: Record<TtsProviderName, string | null> = {
 };
 
 export function listCredentialStatus(): { key: string; present: boolean }[] {
-  const keys = ["ELEVENLABS_API_KEY", "OPENAI_API_KEY", "CARTESIA_API_KEY", "FISH_API_KEY", "COMPOSIO_API_KEY", "PIPEDREAM_API_KEY", "TELEGRAM_BOT_TOKEN"];
+  const keys = ["ELEVENLABS_API_KEY", "OPENAI_API_KEY", "CARTESIA_API_KEY", "FISH_API_KEY", "COMPOSIO_API_KEY", "PIPEDREAM_API_KEY", "TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "DISCORD_ALLOWED_GUILDS", "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "IMAP_HOST", "IMAP_PORT", "IMAP_USER", "IMAP_PASS", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "STRIPE_SECRET_KEY"];
   return keys.map((key) => ({ key, present: credentialFor(key) !== undefined }));
 }
 

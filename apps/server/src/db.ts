@@ -189,6 +189,16 @@ CREATE TABLE IF NOT EXISTS approvals (
     ["subagent.run", "allow"],
     ["search.web", "allow"],
     ["task.update", "allow"],
+    ["email.send", "ask"],
+    ["email.status", "allow"],
+    ["knowledge.index", "allow"],
+    ["knowledge.search", "allow"],
+    ["knowledge.list", "allow"],
+    ["phone.sms", "ask"],
+    ["phone.call", "ask"],
+    ["phone.status", "allow"],
+    ["payment.send", "ask"],
+    ["payment.status", "allow"],
   ];
   const ins = db.prepare("INSERT OR IGNORE INTO tool_policies (tool, mode) VALUES (?,?)");
   for (const [tool, mode] of seed) ins.run(tool, mode);

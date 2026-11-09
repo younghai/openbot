@@ -517,3 +517,47 @@ registerTool({
     return { path: rel, content: fs.readFileSync(file, "utf8").slice(0, 20_000) };
   },
 });
+
+
+// ---------------------------------------------------------------- knowledge base (RAG)
+
+import { indexFile, indexDocument, searchKnowledge, listKnowledge, removeKnowledge } from "../knowledge.js";
+
+registerTool({
+  name: "knowledge.index",
+  description: "Index a file from the workspace as searchable knowledge (RAG). Use for documents the user wants you to reference across conversations.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "file path (relative to knowledge directory or workspace)" },
+    },
+    required: ["path"],
+  },
+  async execute(ctx, args) {
+    const n = indexFile(ctx.bot.id, String(args.path ?? ""));
+    if (n === 0) throw new Error("file not found or empty — upload the file first, then index it");
+    return { ok: true, chunks: n };
+  },
+});
+
+registerTool({
+  name: "knowledge.search",
+  description: "Search the bot's indexed knowledge base. Returns matching chunks from uploaded documents.",
+  parameters: {
+    type: "object",
+    properties: { query: { type: "string", description: "search query" } },
+    required: ["query"],
+  },
+  async execute(ctx, args) {
+    return { results: searchKnowledge(ctx.bot.id, String(args.query ?? ""), 5) };
+  },
+});
+
+registerTool({
+  name: "knowledge.list",
+  description: "List indexed knowledge documents with their chunk counts.",
+  parameters: { type: "object", properties: {} },
+  async execute(ctx) {
+    return { documents: listKnowledge(ctx.bot.id) };
+  },
+});

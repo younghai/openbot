@@ -12,12 +12,19 @@ import { kickQueue } from "./queue.js";
 import { db } from "./db.js";
 import { expirePendingOnBoot } from "./approvals.js";
 import { startTelegramGateway } from "./telegram.js";
+import { startDiscordGateway } from "./channels/discord.js";
+import { startSlackGateway } from "./channels/slack.js";
 
 ensureDirs();
 seedExampleSkill();
 seedDesktopSkill();
 expirePendingOnBoot();
 startTelegramGateway();
+startDiscordGateway();
+startSlackGateway();
+import "./channels/email.js"; // registers email tools
+import "./channels/phone.js";
+import "./channels/payment.js"; // registers phone/SMS tools
 wireDelegation();
 startRoutineScheduler();
 // orphaned 'running' jobs cannot survive a restart — fail them so the queue moves

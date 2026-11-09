@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  openbot:
+    build: .
+    container_name: openbot
+    restart: unless-stopped
+    ports:
+      - "${OPENBOT_PORT:-8940}:8940"
+    volumes:
+      - openbot-data:/data
+    environment:
+      - OPENBOT_HOST=0.0.0.0
+      - OPENBOT_PORT=8940
+      - OPENBOT_DATA_DIR=/data
+      # Telegram: set to enable the remote channel
+      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      # - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}
+      # Discord: set to enable
+      # - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      # Slack: set to enable
+      # - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      # - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8940/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  openbot-data:

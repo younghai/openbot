@@ -133,8 +133,8 @@ filesRouter.get("/knowledge/search", (c) => {
 });
 
 // channel status endpoint (P1-H)
-filesRouter.get("/channel-status", (c) => {
-  const { credentialFor } = require("../voice.js") as typeof import("../voice.js");
+filesRouter.get("/channel-status", async (c) => {
+  const { credentialFor } = await import("../voice.js");
   return c.json({
     telegram: Boolean(credentialFor("TELEGRAM_BOT_TOKEN")),
     discord: Boolean(credentialFor("DISCORD_BOT_TOKEN")),

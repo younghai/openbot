@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { subscribe } from "./ws";
-import type { Bootstrap, NotificationRow } from "./types";
+import type { Bootstrap, BotTemplate, NotificationRow } from "./types";
 import { ChatView } from "./components/ChatView";
 import { Channels } from "./components/Channels";
 import { Computers } from "./components/Computers";
@@ -149,7 +149,7 @@ export function App(): JSX.Element {
               </button>
             );
           })}
-          <NewBotInline refresh={refresh} boot={boot} />
+          <NewBotInline refresh={refresh} boot={boot} onOpenChat={(id) => setPage({ kind: "chat", conversationId: id })} />
         </div>
 
         <div className="side-section">
@@ -226,7 +226,7 @@ export function App(): JSX.Element {
   );
 }
 
-function NewBotInline({ refresh, boot }: { refresh: () => void; boot: Bootstrap }): JSX.Element {
+function NewBotInline({ refresh, boot, onOpenChat }: { refresh: () => void; boot: Bootstrap; onOpenChat: (id: string) => void }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🤖");
@@ -235,6 +235,9 @@ function NewBotInline({ refresh, boot }: { refresh: () => void; boot: Bootstrap 
   const [computerId, setComputerId] = useState("");
   const [tts, setTts] = useState("browser");
   const [busy, setBusy] = useState(false);
+
+  const [templates, setTemplates] = useState<BotTemplate[]>([]);
+  useEffect(() => { if (open) api.botTemplates().then(setTemplates).catch(() => setTemplates([])); }, [open]);
 
   if (!open) {
     return (
@@ -245,6 +248,23 @@ function NewBotInline({ refresh, boot }: { refresh: () => void; boot: Bootstrap 
   }
   return (
     <div className="new-bot-form">
+      {templates.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div className="muted small" style={{ marginBottom: 4 }}>템플릿에서 만들기</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {templates.map((t) => (
+              <button key={t.id} className="btn small" title={t.description}
+                onClick={async () => {
+                  const r = await api.createFromTemplate(t.id).catch(() => null);
+                  if (r) { setOpen(false); refresh(); onOpenChat(r.conversationId); }
+                }}>
+                {t.icon} {t.title}
+              </button>
+            ))}
+          </div>
+          <div className="muted small" style={{ margin: "6px 0" }}>— 또는 직접 만들기 —</div>
+        </div>
+      )}
       <input placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
       <input placeholder="이모지" value={emoji} onChange={(e) => setEmoji(e.target.value)} className="emoji-input" />
       <textarea placeholder="성격/페르소나" value={persona} onChange={(e) => setPersona(e.target.value)} rows={2} />

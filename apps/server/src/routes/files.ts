@@ -104,3 +104,43 @@ filesRouter.delete("/checkpoints/:id", (c) => {
   deleteCheckpoint(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+// ---------------------------------------------------------------- knowledge (RAG)
+
+import { KNOWLEDGE_DIR } from "../knowledge.js";
+import { indexFile, listKnowledge, removeKnowledge, searchKnowledge } from "../knowledge.js";
+
+filesRouter.get("/knowledge", (c) => {
+  const botId = c.req.query("botId") ?? "";
+  return c.json({ documents: listKnowledge(botId) });
+});
+
+filesRouter.post("/knowledge/index", async (c) => {
+  const body = await c.req.json<{ botId: string; path: string }>();
+  const n = indexFile(body.botId, body.path);
+  return c.json({ chunks: n }, n > 0 ? 200 : 400);
+});
+
+filesRouter.delete("/knowledge/:botId/:source", (c) => {
+  removeKnowledge(c.req.param("botId"), decodeURIComponent(c.req.param("source")));
+  return c.json({ ok: true });
+});
+
+filesRouter.get("/knowledge/search", (c) => {
+  const botId = c.req.query("botId") ?? "";
+  const q = c.req.query("q") ?? "";
+  return c.json({ results: searchKnowledge(botId, q, 5) });
+});
+
+// channel status endpoint (P1-H)
+filesRouter.get("/channel-status", (c) => {
+  const { credentialFor } = require("../voice.js") as typeof import("../voice.js");
+  return c.json({
+    telegram: Boolean(credentialFor("TELEGRAM_BOT_TOKEN")),
+    discord: Boolean(credentialFor("DISCORD_BOT_TOKEN")),
+    slack: Boolean(credentialFor("SLACK_BOT_TOKEN") && credentialFor("SLACK_APP_TOKEN")),
+    email: Boolean(credentialFor("SMTP_HOST") && credentialFor("SMTP_USER")),
+    phone: Boolean(credentialFor("TWILIO_ACCOUNT_SID")),
+    payment: Boolean(credentialFor("STRIPE_SECRET_KEY")),
+  });
+});

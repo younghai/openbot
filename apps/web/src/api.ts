@@ -52,6 +52,9 @@ export const api = {
   stats: () => req<Stats>("/stats"),
   notifications: (unread = false) => req<NotificationRow[]>(`/notifications${unread ? "?unread=1" : ""}`),
   markNotificationsRead: () => req<{ ok: boolean; marked: number }>("/notifications/read-all", { method: "POST" }),
+  knowledgeDocs: (botId: string) => req<{ documents: { source: string; chunks: number }[] }>(`/knowledge?botId=${botId}`),
+  indexKnowledge: (botId: string, path: string) => req<{ chunks: number }>("/knowledge/index", { method: "POST", body: JSON.stringify({ botId, path }) }),
+  channelStatus: () => req<Record<string, boolean>>("/channel-status"),
   botTemplates: () => req<BotTemplate[]>("/bot-templates"),
   createFromTemplate: (templateId: string, name?: string) =>
     req<{ id: string; conversationId: string; name: string; routines: number }>(`/bot-templates/${templateId}/create`, { method: "POST", body: JSON.stringify({ name }) }),

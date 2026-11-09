@@ -120,17 +120,6 @@ function wireOutbound(): void {
   });
 }
 
-async function connectSocketMode(): Promise<void> {
-  const res = await fetch("https://wss-primary.slack.com/websocket", {
-    headers: { authorization: `Bearer ${appToken()}` },
-  }).catch(() => null);
-  if (!res || !res.ok) throw new Error("Slack Socket Mode connection failed");
-
-  // Slack Socket Mode uses WebSocket with envelope protocol
-  // For now, use RTM-like polling as a simpler fallback
-  // Full Socket Mode WebSocket is in the roadmap
-}
-
 export function startSlackGateway(): void {
   if (running || !botToken() || !appToken()) return;
   running = true;
@@ -138,12 +127,31 @@ export function startSlackGateway(): void {
   notify("system", "Slack 채널 연결됨", "메시지가 봇으로, 승인 요청이 버튼으로 전달됩니다.");
 
   // Polling-based: check for new messages every 3s via conversations.history
-  // (simpler than Socket Mode, no persistent WS needed for v1)
   void (async function poll(): Promise<void> {
+    const lastTs = new Map<string, string>(); // channel -> last seen ts
     for (;;) {
       try {
         if (!botToken() || !appToken()) { running = false; return; }
-        // Poll bound channels for new messages (simplified v1)
+        for (const [channel] of channelBinds) {
+          const params = new URLSearchParams({ channel, limit: "5" });
+          const since = lastTs.get(channel);
+          if (since) params.set("oldest", String(parseFloat(since) + 0.001));
+          const res = await fetch(`https://slack.com/api/conversations.history?${params}`, {
+            headers: { authorization: `Bearer ${botToken()}` },
+            signal: AbortSignal.timeout(10_000),
+          });
+          const json = (await res.json()) as { ok: boolean; messages?: { ts: string; text: string; user: string; bot_id?: string }[] };
+          if (json.ok && json.messages) {
+            const sorted = json.messages.sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+            for (const msg of sorted) {
+              lastTs.set(channel, msg.ts);
+              if (msg.bot_id || msg.user === "USLACKBOT") continue;
+              if (msg.text.trim()) {
+                await handleEvent({ type: "message", channel, text: msg.text, user: msg.user, ts: msg.ts });
+              }
+            }
+          }
+        }
         await new Promise((r) => setTimeout(r, 3000));
       } catch {
         await new Promise((r) => setTimeout(r, 5000));

@@ -166,12 +166,27 @@ export function startDiscordGateway(): void {
             heartbeatTimer = setInterval(() => {
               ws?.send(JSON.stringify({ op: 1, d: sequence }));
             }, hb);
+            if (sessionId) {
+              ws?.send(JSON.stringify({ op: 6, d: { token: token(), session_id: sessionId, seq: sequence } }));
+            } else {
+              ws?.send(JSON.stringify({
+                op: 2,
+                d: { token: token(), intents: 512 | 32768, properties: { $os: "macos", $browser: "openbot", $device: "openbot" } },
+              }));
+            }
           }
           if (payload.op === 0) {
+            if (payload.t === "READY") {
+              sessionId = (payload.d as { session_id: string }).session_id;
+            }
             if (payload.t === "MESSAGE_CREATE") void handleMessage(payload.d as DiscordMessage);
             if (payload.t === "INTERACTION_CREATE") void handleInteraction(payload.d as Record<string, unknown>);
           }
-          if (payload.op === 7) { ws?.close(); } // reconnect
+          if (payload.op === 7) { ws?.close(); }
+          if (payload.op === 9) {
+            sessionId = "";
+            setTimeout(() => { if (running) void connect(); }, 2000);
+          }
         } catch { /* malformed */ }
       };
       ws.onclose = () => {

@@ -6,9 +6,11 @@ import type { Stats } from "../types";
 export function Dashboard(): JSX.Element {
   const [stats, setStats] = useState<Stats | null>(null);
   const [backupNote, setBackupNote] = useState("");
+  const [channels, setChannels] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => setStats(null));
+    api.channelStatus().then(setChannels).catch(() => setChannels({}));
   }, []);
 
   if (!stats) return <div className="page muted">통계를 불러오는 중…</div>;
@@ -52,6 +54,16 @@ export function Dashboard(): JSX.Element {
           ))}
         </tbody>
       </table>
+
+      <h3>채널 상태</h3>
+      <div className="grid3" style={{ gap: 10 }}>
+        {[["Telegram", channels.telegram], ["Discord", channels.discord], ["Slack", channels.slack], ["이메일", channels.email], ["전화·SMS", channels.phone], ["결제", channels.payment]].map(([name, on]) => (
+          <div key={String(name)} className="card stat" style={{ padding: "10px 14px" }}>
+            <span style={{ fontSize: 18 }}>{on ? "🟢" : "⚪"}</span> <span className="small">{name}</span>
+            <span className={`badge ${on ? "ok" : ""}`}>{on ? "연결됨" : "미설정"}</span>
+          </div>
+        ))}
+      </div>
 
       <h3>데이터 백업</h3>
       <div className="card row">

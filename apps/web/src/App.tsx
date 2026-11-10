@@ -90,8 +90,24 @@ export function App(): JSX.Element {
   }
   if (!boot) return <div className="app error-screen muted">불러오는 중…</div>;
 
+  // Spotlight effect: track mouse position for card glow
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent): void => {
+      const card = (e.target as HTMLElement).closest?.(".card, .template-card") as HTMLElement | null;
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+        card.style.setProperty("--my", `${e.clientY - rect.top}px`);
+      }
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    return () => document.removeEventListener("mousemove", onMouseMove);
+  }, []);
+
   return (
-    <div className="app">
+    <>
+      <div className="aurora" />
+      <div className="app">
       {boot.bots.length === 0 && !wizardDone && (
         <Wizard onDone={(conversationId) => { localStorage.setItem("openbotWizardDone", "1"); setWizardDone(true); refresh(); setPage({ kind: "chat", conversationId }); }} />
       )}
@@ -222,7 +238,8 @@ export function App(): JSX.Element {
         {page.kind === "settings" && <Settings boot={boot} refresh={refresh} />}
         {page.kind === "audit" && <AuditLog boot={boot} />}
       </main>
-    </div>
+      </div>
+    </>
   );
 }
 

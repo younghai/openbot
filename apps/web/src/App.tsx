@@ -72,6 +72,20 @@ export function App(): JSX.Element {
     });
   }, [refresh, loadNotifications]);
 
+  // Spotlight effect: track mouse position for card glow (must be before any conditional return)
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent): void => {
+      const card = (e.target as HTMLElement).closest?.(".card, .template-card") as HTMLElement | null;
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+        card.style.setProperty("--my", `${e.clientY - rect.top}px`);
+      }
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    return () => document.removeEventListener("mousemove", onMouseMove);
+  }, []);
+
   const botFor = (conversationId: string) => {
     const conv = boot?.conversations.find((c) => c.id === conversationId);
     return boot?.bots.find((b) => b.id === conv?.bot_id) ?? null;
@@ -89,20 +103,6 @@ export function App(): JSX.Element {
     );
   }
   if (!boot) return <div className="app error-screen muted">불러오는 중…</div>;
-
-  // Spotlight effect: track mouse position for card glow
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent): void => {
-      const card = (e.target as HTMLElement).closest?.(".card, .template-card") as HTMLElement | null;
-      if (card) {
-        const rect = card.getBoundingClientRect();
-        card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-        card.style.setProperty("--my", `${e.clientY - rect.top}px`);
-      }
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    return () => document.removeEventListener("mousemove", onMouseMove);
-  }, []);
 
   return (
     <>

@@ -38,6 +38,7 @@ export function App(): JSX.Element {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [wizardDone, setWizardDone] = useState(() => localStorage.getItem("openbotWizardDone") === "1");
   const unread = notifications.filter((n) => !n.read_at).length;
 
@@ -140,8 +141,7 @@ export function App(): JSX.Element {
         )}
 
         <div className="side-section">
-          <div className="side-title">작업</div>
-          <button className="side-item" onClick={() => setSearchOpen(true)}>
+          <button className="side-item search-btn" onClick={() => setSearchOpen(true)}>
             <span className="side-emoji">🔍</span>
             <span className="side-name">검색</span>
             <span className="muted small">⌘K</span>
@@ -170,13 +170,6 @@ export function App(): JSX.Element {
 
         <div className="side-section">
           <div className="side-title">채널</div>
-          <button
-            className={`side-item ${page.kind === "channels" && !channelConversations.length ? "active" : ""}`}
-            onClick={() => setPage({ kind: "channels" })}
-          >
-            <span className="side-emoji">#</span>
-            <span className="side-name">채널 관리</span>
-          </button>
           {channelConversations.map((conv) => (
             <button
               key={conv.id}
@@ -187,37 +180,69 @@ export function App(): JSX.Element {
               <span className="side-name">{conv.title ?? "channel"}</span>
             </button>
           ))}
+          <button
+            className={`side-item ${page.kind === "channels" && !channelConversations.length ? "active" : ""}`}
+            onClick={() => setPage({ kind: "channels" })}
+          >
+            <span className="side-emoji">+</span>
+            <span className="side-name muted">채널 만들기</span>
+          </button>
         </div>
 
         <div className="side-section">
-          <div className="side-title">관리</div>
+          <div className="side-title">작업</div>
           <button className={`side-item ${page.kind === "board" ? "active" : ""}`} onClick={() => setPage({ kind: "board" })}>
-            작업 보드
+            <span className="side-emoji">📋</span>
+            <span className="side-name">작업 보드</span>
           </button>
           <button className={`side-item ${page.kind === "dashboard" ? "active" : ""}`} onClick={() => setPage({ kind: "dashboard" })}>
-            대시보드
-          </button>
-          <button className={`side-item ${page.kind === "files" ? "active" : ""}`} onClick={() => setPage({ kind: "files" })}>
-            파일
+            <span className="side-emoji">📊</span>
+            <span className="side-name">대시보드</span>
           </button>
           <button className={`side-item ${page.kind === "inbox" ? "active" : ""}`} onClick={() => setPage({ kind: "inbox" })}>
-            승인{pendingApprovals > 0 && <span className="badge warn">대기 {pendingApprovals}</span>}
+            <span className="side-emoji">🔒</span>
+            <span className="side-name">승인</span>
+            {pendingApprovals > 0 && <span className="badge warn">{pendingApprovals}</span>}
           </button>
-          <button className={`side-item ${page.kind === "computers" ? "active" : ""}`} onClick={() => setPage({ kind: "computers" })}>
-            컴퓨터
+        </div>
+
+        <div className="side-section">
+          <button
+            className={`side-group-toggle ${["computers","routines","sources","settings","audit","files"].includes(page.kind) ? "active" : ""}`}
+            onClick={() => setAdminOpen(!adminOpen)}
+          >
+            <span className="side-emoji">⚙️</span>
+            <span className="side-name">설정 · 관리</span>
+            <span className="side-chevron">{adminOpen ? "▾" : "▸"}</span>
           </button>
-          <button className={`side-item ${page.kind === "routines" ? "active" : ""}`} onClick={() => setPage({ kind: "routines" })}>
-            루틴
-          </button>
-          <button className={`side-item ${page.kind === "sources" ? "active" : ""}`} onClick={() => setPage({ kind: "sources" })}>
-            툴 소스
-          </button>
-          <button className={`side-item ${page.kind === "settings" ? "active" : ""}`} onClick={() => setPage({ kind: "settings" })}>
-            설정
-          </button>
-          <button className={`side-item ${page.kind === "audit" ? "active" : ""}`} onClick={() => setPage({ kind: "audit" })}>
-            감사 로그
-          </button>
+          {adminOpen && (
+            <div className="side-group-body">
+              <button className={`side-item sub ${page.kind === "files" ? "active" : ""}`} onClick={() => setPage({ kind: "files" })}>
+                <span className="side-emoji">📁</span>
+                <span className="side-name">파일 · 지식</span>
+              </button>
+              <button className={`side-item sub ${page.kind === "computers" ? "active" : ""}`} onClick={() => setPage({ kind: "computers" })}>
+                <span className="side-emoji">💻</span>
+                <span className="side-name">컴퓨터</span>
+              </button>
+              <button className={`side-item sub ${page.kind === "routines" ? "active" : ""}`} onClick={() => setPage({ kind: "routines" })}>
+                <span className="side-emoji">⏰</span>
+                <span className="side-name">루틴</span>
+              </button>
+              <button className={`side-item sub ${page.kind === "sources" ? "active" : ""}`} onClick={() => setPage({ kind: "sources" })}>
+                <span className="side-emoji">🔌</span>
+                <span className="side-name">툴 소스</span>
+              </button>
+              <button className={`side-item sub ${page.kind === "settings" ? "active" : ""}`} onClick={() => setPage({ kind: "settings" })}>
+                <span className="side-emoji">⚙️</span>
+                <span className="side-name">설정</span>
+              </button>
+              <button className={`side-item sub ${page.kind === "audit" ? "active" : ""}`} onClick={() => setPage({ kind: "audit" })}>
+                <span className="side-emoji">📜</span>
+                <span className="side-name">감사 로그</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="side-footer muted small">

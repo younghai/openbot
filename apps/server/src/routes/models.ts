@@ -79,3 +79,23 @@ modelsRouter.post("/providers/:id/test", async (c) => {
     return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, 502);
   }
 });
+
+// ---------------------------------------------------------------- Ollama model pull (P0-A)
+
+modelsRouter.post("/presets/ollama/pull", async (c) => {
+  const body = await c.req.json<{ model?: string }>();
+  const model = String(body.model ?? "").trim();
+  if (!model) return c.json({ error: "model required" }, 400);
+  try {
+    const res = await fetch("http://localhost:11434/api/pull", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model, stream: false }),
+      signal: AbortSignal.timeout(300_000),
+    });
+    if (!res.ok) return c.json({ error: `Ollama pull HTTP ${res.status}` }, 502);
+    return c.json({ ok: true, model });
+  } catch (err) {
+    return c.json({ error: `Ollama pull failed: ${err instanceof Error ? err.message : String(err)}` }, 502);
+  }
+});

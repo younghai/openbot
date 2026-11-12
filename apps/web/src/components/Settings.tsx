@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
-import type { Bootstrap, ModelPreset, PresetModel, TtsProvider } from "../types";
+import type { Bootstrap, ModelPreset, PresetModel, Prompt, TtsProvider } from "../types";
 
 export function Settings({ boot, refresh }: { boot: Bootstrap; refresh: () => void }): JSX.Element {
   return (
     <div className="page">
       <ProviderSection boot={boot} refresh={refresh} />
+      <ModelPullSection refresh={refresh} />
+      <PromptLibrarySection refresh={refresh} />
       <CredentialSection boot={boot} refresh={refresh} />
       <h2>스킬 라이브러리</h2>
       <p className="muted">
@@ -165,6 +167,105 @@ function ProviderSection({ boot, refresh }: { boot: Bootstrap; refresh: () => vo
               삭제
             </button>
           </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- model pull (P0-A)
+
+function ModelPullSection({ refresh }: { refresh: () => void }): JSX.Element {
+  const [modelName, setModelName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  return (
+    <>
+      <h2>모델 받기 (Ollama)</h2>
+      <p className="muted">Ollama 모델을 다운로드합니다. 예: qwen3.5:4b, llama3.2:3b, phi3.5</p>
+      <div className="card">
+        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+          <input
+            style={{ flex: "1 1 200px" }}
+            placeholder="모델 이름 (예: qwen3.5:14b)"
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === "Enter" && modelName.trim() && !busy) {
+                setBusy(true); setNote("다운로드 중… (큰 모델은 몇 분 걸릴 수 있습니다)");
+                try {
+                  const r = await api.pullModel(modelName.trim());
+                  setNote(r.ok ? `✅ ${modelName.trim()} 다운로드 완료` : `실패: ${r.error}`);
+                  if (r.ok) { setModelName(""); refresh(); }
+                } catch (err) {
+                  setNote(`실패: ${err instanceof Error ? err.message : String(err)}`);
+                } finally { setBusy(false); }
+              }
+            }}
+          />
+          <button
+            className="btn primary"
+            disabled={!modelName.trim() || busy}
+            onClick={async () => {
+              setBusy(true); setNote("다운로드 중… (큰 모델은 몇 분 걸릴 수 있습니다)");
+              try {
+                const r = await api.pullModel(modelName.trim());
+                setNote(r.ok ? `✅ ${modelName.trim()} 다운로드 완료` : `실패: ${r.error}`);
+                if (r.ok) { setModelName(""); refresh(); }
+              } catch (err) {
+                setNote(`실패: ${err instanceof Error ? err.message : String(err)}`);
+              } finally { setBusy(false); }
+            }}
+          >
+            {busy ? "받는 중…" : "다운로드"}
+          </button>
+        </div>
+        {note && <p className="small" style={{ color: note.startsWith("✅") ? "var(--success)" : "var(--muted)" }}>{note}</p>}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- prompt library (P1-C)
+
+function PromptLibrarySection({ refresh }: { refresh: () => void }): JSX.Element {
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+
+  const load = () => api.prompts().then(setPrompts).catch(() => setPrompts([]));
+  useEffect(() => { load(); }, []);
+
+  return (
+    <>
+      <h2>프롬프트 라이브러리</h2>
+      <p className="muted">자주 쓰는 프롬프트를 저장하고 채팅에서 / 로 빠르게 꺼냅니다.</p>
+      <div className="card">
+        <div className="form-grid">
+          <label>제목</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 코드 리뷰 요청" />
+          <label>내용</label>
+          <textarea rows={3} value={content} onChange={(e) => setContent(e.target.value)} placeholder="프롬프트 내용" />
+        </div>
+        <button
+          className="btn primary small"
+          disabled={!title.trim() || !content.trim()}
+          onClick={async () => {
+            await api.createPrompt(title.trim(), content.trim());
+            setTitle(""); setContent(""); load();
+          }}
+        >
+          저장
+        </button>
+      </div>
+      {prompts.map((p) => (
+        <div key={p.id} className="card row">
+          <div>
+            <strong>{p.title}</strong>
+            <div className="muted small">{p.content.slice(0, 80)}…</div>
+          </div>
+          <button className="btn small danger" onClick={async () => { await api.deletePrompt(p.id); load(); }}>삭제</button>
         </div>
       ))}
     </>

@@ -7,6 +7,8 @@ export interface Bot {
   computer_id: string | null;
   tts_provider: TtsProvider;
   status: "active" | "paused";
+  pinned?: number;
+  hidden?: number;
   created_at: number;
 }
 
@@ -210,6 +212,11 @@ export interface Task {
 }
 
 export interface BotTemplateRoutine { name: string; cron: string; prompt: string }
+export interface Prompt { id: string; title: string; content: string; created_at: number }
+export interface FeedbackStats { up: number; down: number; satisfaction: number | null }
+export interface ToolUsageRow { tool_name: string; count: number }
+export interface ModelUsageRow { model: string; tokens_in: number; tokens_out: number }
+
 export interface BotTemplate {
   id: string; icon: string; title: string; description: string; emoji: string;
   persona: string; firstMessage: string; routines: BotTemplateRoutine[];
@@ -257,6 +264,9 @@ export interface Stats {
     pendingApprovals: number;
     tasks: Record<string, number>;
   };
+  feedback?: { up: number; down: number; satisfaction: number | null };
+  toolUsage?: { tool_name: string; count: number }[];
+  modelUsage?: { model: string; tokens_in: number; tokens_out: number }[];
 }
 
 

@@ -1,4 +1,4 @@
-import type { Approval, AuditRow, Bootstrap, BotTemplate, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
+import type { Approval, AuditRow, Bootstrap, BotTemplate, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, Prompt, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -55,6 +55,15 @@ export const api = {
   knowledgeDocs: (botId: string) => req<{ documents: { source: string; chunks: number }[] }>(`/knowledge?botId=${botId}`),
   indexKnowledge: (botId: string, path: string) => req<{ chunks: number }>("/knowledge/index", { method: "POST", body: JSON.stringify({ botId, path }) }),
   channelStatus: () => req<Record<string, boolean>>("/channel-status"),
+  pullModel: (model: string) => req<{ ok: boolean; model?: string; error?: string }>("/presets/ollama/pull", { method: "POST", body: JSON.stringify({ model }) }),
+  sendFeedback: (messageId: string, conversationId: string, botId: string | null, rating: "up" | "down") =>
+    req<{ ok: boolean; rating?: string; removed?: boolean }>("/feedback", { method: "POST", body: JSON.stringify({ messageId, conversationId, botId, rating }) }),
+  feedbackStats: () => req<{ up: number; down: number; satisfaction: number | null }>("/feedback/stats"),
+  prompts: () => req<Prompt[]>("/prompts"),
+  createPrompt: (title: string, content: string) => req<{ id: string }>("/prompts", { method: "POST", body: JSON.stringify({ title, content }) }),
+  deletePrompt: (id: string) => req<{ ok: boolean }>(`/prompts/${id}`, { method: "DELETE" }),
+  pinBot: (id: string, pinned: boolean) => req<{ ok: boolean }>(`/bots/${id}/pin`, { method: "PATCH", body: JSON.stringify({ pinned }) }),
+  hideBot: (id: string, hidden: boolean) => req<{ ok: boolean }>(`/bots/${id}/hide`, { method: "PATCH", body: JSON.stringify({ hidden }) }),
   botTemplates: () => req<BotTemplate[]>("/bot-templates"),
   createFromTemplate: (templateId: string, name?: string) =>
     req<{ id: string; conversationId: string; name: string; routines: number }>(`/bot-templates/${templateId}/create`, { method: "POST", body: JSON.stringify({ name }) }),

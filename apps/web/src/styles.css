@@ -452,3 +452,11 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-si
 .genui-card [class*="chart"] { color-scheme: dark; }
 .genui-card [class*="table"] { font-size: 12px; }
 .genui-card [class*="card"] { background: transparent; border: none; padding: 0; }
+
+/* message feedback */
+.feedback-row { display: flex; gap: 2px; align-self: flex-end; }
+.icon-btn.feedback { font-size: 13px; padding: 3px 6px; border-radius: 6px; opacity: 0.4; transition: opacity 0.15s; }
+.icon-btn.feedback:hover { opacity: 1; }
+
+/* bot pin indicator */
+.side-item .pin { font-size: 11px; margin-left: auto; }

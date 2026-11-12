@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
-import type { Stats } from "../types";
+import type { Stats, FeedbackStats, ToolUsageRow, ModelUsageRow } from "../types";
 
-/** 플릿 대시보드: 봇별 활동·도구 호출·토큰·루틴 상태 + 전체 요약. */
+/** 플릿 대시보드: 봇별 활동·도구 호출·토큰·루틴 상태 + 전체 요약 + 만족도·도구 패턴·모델 사용량. */
 export function Dashboard(): JSX.Element {
   const [stats, setStats] = useState<Stats | null>(null);
   const [backupNote, setBackupNote] = useState("");
   const [channels, setChannels] = useState<Record<string, boolean>>({});
+  const [feedback, setFeedback] = useState<FeedbackStats | null>(null);
+  const [toolUsage, setToolUsage] = useState<ToolUsageRow[]>([]);
+  const [modelUsage, setModelUsage] = useState<ModelUsageRow[]>([]);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => setStats(null));
     api.channelStatus().then(setChannels).catch(() => setChannels({}));
+    api.feedbackStats().then((r) => setFeedback({ up: r.up, down: r.down, satisfaction: r.satisfaction ?? null })).catch(() => setFeedback(null));
   }, []);
 
   if (!stats) return <div className="page muted">통계를 불러오는 중…</div>;
@@ -34,6 +38,19 @@ export function Dashboard(): JSX.Element {
         </div>
       </div>
 
+      {stats.feedback && (
+        <div className="card row" style={{ marginTop: 10 }}>
+          <span style={{ fontSize: 20 }}>{stats.feedback.satisfaction !== null ? "😊" : "⚪"}</span>
+          <div>
+            <strong className="small">만족도</strong>
+            <span className="muted small">
+              👍 {stats.feedback.up} · 👎 {stats.feedback.down}
+              {stats.feedback.satisfaction !== null && ` · ${stats.feedback.satisfaction}%`}
+            </span>
+          </div>
+        </div>
+      )}
+
       <h3>봇별 활동</h3>
       <table>
         <thead>
@@ -54,6 +71,32 @@ export function Dashboard(): JSX.Element {
           ))}
         </tbody>
       </table>
+
+      <h3>도구 사용 패턴</h3>
+      {stats.toolUsage && stats.toolUsage.length > 0 && (
+        <div className="chips">
+          {stats.toolUsage.map((t) => (
+            <span key={t.tool_name} className="chip static">{t.tool_name.replace(/\./g, "·")} <b>{t.count}</b></span>
+          ))}
+        </div>
+      )}
+
+      <h3>모델별 토큰 사용</h3>
+      {stats.modelUsage && stats.modelUsage.length > 0 && (
+        <table>
+          <thead><tr><th>모델</th><th>입력 토큰</th><th>출력 토큰</th><th>합계</th></tr></thead>
+          <tbody>
+            {stats.modelUsage.map((m) => (
+              <tr key={m.model}>
+                <td><code>{m.model}</code></td>
+                <td>{fmt(m.tokens_in ?? 0)}</td>
+                <td>{fmt(m.tokens_out ?? 0)}</td>
+                <td>{fmt((m.tokens_in ?? 0) + (m.tokens_out ?? 0))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <h3>채널 상태</h3>
       <div className="grid3" style={{ gap: 10 }}>

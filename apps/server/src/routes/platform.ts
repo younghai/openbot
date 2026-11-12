@@ -207,7 +207,7 @@ platformRouter.get("/search", async (c) => {
 
 platformRouter.get("/stats", (c) => {
   const dayAgo = now() - 86_400_000;
-  const bots = db.prepare("SELECT id, name, emoji, status FROM bots ORDER BY created_at").all() as { id: string; name: string; emoji: string; status: string }[];
+  const bots = db.prepare("SELECT id, name, emoji, status, pinned, hidden FROM bots ORDER BY pinned DESC, created_at").all() as { id: string; name: string; emoji: string; status: string }[];
   const msgCounts = Object.fromEntries(
     (db.prepare("SELECT bot_id, COUNT(*) n FROM messages WHERE role IN ('user','assistant') GROUP BY bot_id").all() as { bot_id: string; n: number }[]).map((r) => [r.bot_id, r.n])
   );
@@ -225,6 +225,26 @@ platformRouter.get("/stats", (c) => {
     } catch { /* skip malformed meta */ }
   }
   const pendingApprovals = (db.prepare("SELECT COUNT(*) n FROM approvals WHERE status='pending'").get() as { n: number }).n;
+  // feedback satisfaction
+  const feedback = db.prepare(`
+    SELECT COALESCE(SUM(CASE WHEN rating='up' THEN 1 ELSE 0 END), 0) as up,
+           COALESCE(SUM(CASE WHEN rating='down' THEN 1 ELSE 0 END), 0) as down
+    FROM message_feedback
+  `).get() as { up: number; down: number };
+  // tool usage pattern (top 10)
+  const toolUsage = db.prepare(`
+    SELECT tool_name, COUNT(*) as count FROM messages
+    WHERE role='tool' AND tool_name IS NOT NULL
+    GROUP BY tool_name ORDER BY count DESC LIMIT 10
+  `).all() as { tool_name: string; count: number }[];
+  // model token usage
+  const modelUsage = db.prepare(`
+    SELECT json_extract(meta, '$.model') as model,
+           SUM(json_extract(meta, '$.usage.inputTokens')) as tokens_in,
+           SUM(json_extract(meta, '$.usage.outputTokens')) as tokens_out
+    FROM messages WHERE role='assistant' AND meta LIKE '%model%'
+    GROUP BY model ORDER BY tokens_in + tokens_out DESC LIMIT 5
+  `).all() as { model: string; tokens_in: number; tokens_out: number }[];
   const taskBoard = Object.fromEntries(
     (db.prepare("SELECT status, COUNT(*) n FROM tasks GROUP BY status").all() as { status: string; n: number }[]).map((r) => [r.status, r.n])
   );
@@ -246,6 +266,9 @@ platformRouter.get("/stats", (c) => {
       pendingApprovals,
       tasks: taskBoard,
     },
+    feedback: { up: feedback.up, down: feedback.down, satisfaction: feedback.up + feedback.down > 0 ? Math.round(feedback.up / (feedback.up + feedback.down) * 100) : null },
+    toolUsage,
+    modelUsage,
   });
 });
 

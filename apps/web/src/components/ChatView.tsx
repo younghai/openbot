@@ -59,6 +59,7 @@ export function ChatView({
   const [showEdit, setShowEdit] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<Approval | null>(null);
   const [thinkingChars, setThinkingChars] = useState(0);
+  const [savedPrompts, setSavedPrompts] = useState<{ id: string; title: string; content: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<{ file: File; url: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -79,6 +80,10 @@ export function ChatView({
     const older = await api.messagesBefore(conversationId, oldest.created_at).catch(() => []);
     if (older.length > 0) setMessages((m) => [...older, ...m]);
   };
+
+  useEffect(() => {
+    api.prompts().then(setSavedPrompts).catch(() => setSavedPrompts([]));
+  }, []);
 
   useEffect(() => {
     setLiveDelta("");
@@ -374,7 +379,18 @@ export function ChatView({
         <textarea
           value={input}
           placeholder={listening ? "듣고 있습니다…" : "메시지 입력 (Enter 전송, 이미지 붙여넣기 가능)"}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+                setInput(e.target.value);
+                // / autocomplete: insert first matching saved prompt
+                const v = e.target.value;
+                if (v.startsWith("/") && savedPrompts.length > 0) {
+                  const match = savedPrompts.find((p) => p.title.toLowerCase().startsWith(v.slice(1).toLowerCase()));
+                  if (match) {
+                    setInput(match.content);
+                    return;
+                  }
+                }
+              }}
           onPaste={(e) => {
             const files = [...(e.clipboardData?.files ?? [])];
             if (files.length > 0) {
@@ -450,6 +466,12 @@ function MessageRow({ m, bots }: { m: Message; bots: Bootstrap["bots"] }): JSX.E
     <div className="msg assistant">
       <div className="avatar">{bot?.emoji ?? "🤖"}</div>
       <div className="bubble">{m.content || <span className="muted">(도구 호출 턴)</span>}</div>
+      {m.content && (
+        <div className="feedback-row">
+          <button className="icon-btn feedback" title="좋아요" onClick={() => void api.sendFeedback(m.id, m.conversation_id, m.bot_id, "up").catch(() => undefined)}>👍</button>
+          <button className="icon-btn feedback" title="별로예요" onClick={() => void api.sendFeedback(m.id, m.conversation_id, m.bot_id, "down").catch(() => undefined)}>👎</button>
+        </div>
+      )}
     </div>
   );
 }

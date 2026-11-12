@@ -211,6 +211,22 @@ CREATE TABLE IF NOT EXISTS approvals (
 
 // ---- additive migrations (2026-11-04): steering mute + memory channel scope ----
 try { db.exec("ALTER TABLE conversations ADD COLUMN muted INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE bots ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE bots ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+db.exec(`CREATE TABLE IF NOT EXISTS message_feedback (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  bot_id TEXT,
+  rating TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS prompts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+)`);
 try { db.exec("ALTER TABLE memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'dm'"); } catch { /* exists */ }
 
 

@@ -93,6 +93,7 @@ export function App(): JSX.Element {
   };
 
   const dmConversations = (boot?.conversations ?? []).filter((c) => c.kind === "dm");
+  const visibleBots = new Set(boot?.bots.filter((b) => !b.hidden).map((b) => b.id) ?? []);
   const channelConversations = (boot?.conversations ?? []).filter((c) => c.kind === "channel");
 
   if (error) {
@@ -161,6 +162,7 @@ export function App(): JSX.Element {
               >
                 <span className="side-emoji">{bot?.emoji ?? "🤖"}</span>
                 <span className="side-name">{bot?.name ?? "?"}</span>
+                {(bot as { pinned?: number })?.pinned === 1 && <span title="고정됨">📌</span>}
                 {bot?.status === "paused" && <span className="badge warn">일시정지</span>}
               </button>
             );

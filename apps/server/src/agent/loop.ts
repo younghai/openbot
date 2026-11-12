@@ -8,6 +8,7 @@ import "../tools/core.js"; // registers core tools
 import "../tools/browser.js"; // registers interactive browser tools (optional playwright)
 import "../tools/desktop-native.js"; // registers native desktop computer-use (optional agent-desktop)
 import "../tools/research.js"; // registers arxiv/pubmed search + research report
+import "../tools/genui.js"; // registers generative UI (OpenUI Lang)
 import { setDelegationRunner } from "../tools/core.js";
 import { listDynamicTools } from "../tools/dynamic.js";
 import { guardExternal } from "../injection.js";

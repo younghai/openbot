@@ -3,6 +3,7 @@ import { api, mediaUrl } from "../api";
 import { subscribe } from "../ws";
 import type { Approval, Bootstrap, Message } from "../types";
 import { MemoryPanel } from "./MemoryPanel";
+import { GenUICard } from "./GenUICard";
 import { EditBotModal } from "./EditBotModal";
 
 /* --- minimal Web Speech typings (not in TS DOM lib) --- */
@@ -459,6 +460,17 @@ function ToolCard({ name, result, pending }: { name: string; result?: unknown; p
   if (result && typeof result === "object") {
     for (const value of Object.values(result as Record<string, unknown>)) {
       if (typeof value === "string" && value.startsWith("/api/media/")) mediaPaths.push(value);
+    }
+  }
+  // Generative UI: render OpenUI Lang output as rich components
+  if (name === "ui.render" && result && typeof result === "object") {
+    const r = result as { rendered?: boolean; code?: string };
+    if (r.rendered && r.code) {
+      return (
+        <div className="genui-wrapper">
+          <GenUICard code={r.code} />
+        </div>
+      );
     }
   }
   return (

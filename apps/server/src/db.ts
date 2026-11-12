@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     ["arxiv.search", "allow"],
     ["pubmed.search", "allow"],
     ["research.report", "ask"],
+    ["ui.render", "allow"],
     ["phone.sms", "ask"],
     ["phone.call", "ask"],
     ["phone.status", "allow"],

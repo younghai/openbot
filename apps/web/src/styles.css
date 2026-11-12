@@ -441,3 +441,14 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-si
 
 .side-item.sub { font-size: 12.5px; padding: 5px 8px; }
 .side-item.sub .side-emoji { font-size: 14px; }
+
+/* generative UI */
+.genui-wrapper { max-width: 78%; align-self: flex-start; margin: 4px 0; }
+.genui-card {
+  background: var(--panel); border: 1px solid var(--border-glow); border-radius: 14px;
+  padding: 14px; backdrop-filter: blur(12px); overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.genui-card [class*="chart"] { color-scheme: dark; }
+.genui-card [class*="table"] { font-size: 12px; }
+.genui-card [class*="card"] { background: transparent; border: none; padding: 0; }

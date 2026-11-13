@@ -44,7 +44,7 @@ export interface RunOpts {
 }
 
 const MAX_ITERATIONS = 12;
-const COMPACT_THRESHOLD_CHARS = 24_000;
+const COMPACT_THRESHOLD_CHARS = 48_000;
 
 export function getBot(botId: string): BotRow | undefined {
   return db.prepare("SELECT * FROM bots WHERE id=?").get(botId) as unknown as BotRow | undefined;
@@ -90,7 +90,7 @@ export function insertMessage(
     id, conversationId, botId, role, content,
     extra.toolName ?? null,
     extra.toolArgs !== undefined ? JSON.stringify(extra.toolArgs).slice(0, 8000) : null,
-    extra.toolResult !== undefined ? JSON.stringify(extra.toolResult).slice(0, 12_000) : null,
+    extra.toolResult !== undefined ? JSON.stringify(extra.toolResult).slice(0, 32_000) : null,
     extra.meta ? JSON.stringify(extra.meta) : null,
     now()
   );
@@ -256,25 +256,49 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
 
     for (const call of res.message.tool_calls) {
       emit({ type: "tool_start", botId: bot.id, conversationId: opts.conversationId, tool: call.name, args: call.args });
-      const raw = await executeTool(ctx, call.name, call.args);
+      let raw = await executeTool(ctx, call.name, call.args);
+
+      // retry once on failure with actionable feedback for the model
+      if (!raw.ok) {
+        const errText = String((raw.result as Record<string, unknown>)?.error ?? "");
+        const isRetryable = !/승인|approval|denied|blocked|guard 차단|spend cap|not approved/.test(errText);
+        if (isRetryable) {
+          const retryRaw = await executeTool(ctx, call.name, call.args);
+          if (retryRaw.ok) raw = retryRaw;
+        }
+      }
+
       // external content is data, never instructions (injection guard)
       const { result } = guardExternal(call.name, raw.result);
       const ok = raw.ok;
+
+      // actionable error feedback so the model can self-correct
+      let contentForResult: unknown = result;
+      if (!ok && result && typeof result === "object" && !Array.isArray(result)) {
+        const r = result as Record<string, unknown>;
+        if (typeof r.error === "string") {
+          contentForResult = {
+            ...r,
+            hint: `도구 ${call.name}이(가) 실패했습니다. 오류: ${r.error}. 매개변수를 확인하고 다른 방식으로 시도하세요.`,
+          };
+        }
+      }
+
       toolCount++;
       emit({ type: "tool_end", botId: bot.id, conversationId: opts.conversationId, tool: call.name, result });
       if (opts.conversationId) {
         insertMessage(opts.conversationId, bot.id, "tool", "", {
           toolName: call.name,
           toolArgs: call.args,
-          toolResult: result,
-          meta: { tool_call_id: call.id, ok },
+          toolResult: contentForResult,
+          meta: { tool_call_id: call.id, ok, retried: !raw.ok && ok },
         });
       }
       messages.push({
         role: "tool",
         tool_call_id: call.id,
         name: call.name,
-        content: JSON.stringify(result).slice(0, 12_000),
+        content: JSON.stringify(contentForResult).slice(0, 32_000),
       });
       void ok;
     }

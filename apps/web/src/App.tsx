@@ -39,7 +39,11 @@ export function App(): JSX.Element {
   const [bellOpen, setBellOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [wizardDone, setWizardDone] = useState(() => localStorage.getItem("openbotWizardDone") === "1");
+
+  // 페이지가 바뀌면 모바일 내비 드로어를 닫는다 (모든 내비게이션이 setPage를 거침)
+  useEffect(() => { setNavOpen(false); }, [page]);
   const unread = notifications.filter((n) => !n.read_at).length;
 
   const refresh = useCallback(() => {
@@ -114,7 +118,9 @@ export function App(): JSX.Element {
         <Wizard onDone={(conversationId) => { localStorage.setItem("openbotWizardDone", "1"); setWizardDone(true); refresh(); setPage({ kind: "chat", conversationId }); }} />
       )}
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} onOpenChat={(id) => setPage({ kind: "chat", conversationId: id })} />}
-      <aside className="sidebar">
+      <button className="nav-toggle" aria-label="메뉴" onClick={() => setNavOpen(true)}>☰</button>
+      {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} />}
+      <aside className={`sidebar${navOpen ? " open" : ""}`}>
         <div className="brand">
           OpenBot <span className="brand-sub">그록봇 대체재</span>
           <span className={`ws-dot ${wsOn ? "on" : ""}`} title={wsOn ? "실시간 연결됨" : "연결 중"} />

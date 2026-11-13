@@ -1,0 +1,13 @@
+{
+  "name": "OpenBot",
+  "short_name": "OpenBot",
+  "description": "셀프호스팅 AI 팀원 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#7c3aed",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

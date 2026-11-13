@@ -7,3 +7,5 @@ data/
 .DS_Store
 *.log
 openbot-v2/
+.codegraph/
+.zcode/

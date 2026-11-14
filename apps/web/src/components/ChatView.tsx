@@ -3,7 +3,7 @@ import { api, mediaUrl } from "../api";
 import { subscribe } from "../ws";
 import type { Approval, Bootstrap, Message } from "../types";
 import { MemoryPanel } from "./MemoryPanel";
-import { GenUICard } from "./GenUICard";
+import { GenUICard, type UiActionEvent } from "./GenUICard";
 import { EditBotModal } from "./EditBotModal";
 
 /* --- minimal Web Speech typings (not in TS DOM lib) --- */
@@ -209,6 +209,19 @@ export function ChatView({
     setPendingFiles((p) => [...p, ...imgs.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
   }
 
+  /** 제너러티브 UI 액션 (OpenUI 표준): open_url은 새 탭, 나머지는 대화로 되돌려 봇이 이어서 처리 */
+  function handleUiAction(ev: UiActionEvent): void {
+    if (ev.type === "open_url" && typeof ev.params?.url === "string") {
+      window.open(ev.params.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const parts = [`[UI 액션: ${ev.type}]`];
+    if (ev.humanFriendlyMessage) parts.push(String(ev.humanFriendlyMessage));
+    if (ev.formName) parts.push(`form=${ev.formName}`);
+    if (ev.formState && Object.keys(ev.formState).length > 0) parts.push(`입력값: ${JSON.stringify(ev.formState)}`);
+    void send(parts.join(" "));
+  }
+
   async function speak(text: string): Promise<void> {
     if (!text) return;
     const provider = bot?.tts_provider ?? "browser";
@@ -339,7 +352,7 @@ export function ChatView({
             </div>
           )}
           {messages.map((m) => (
-            <MessageRow key={m.id} m={m} bots={boot.bots} />
+            <MessageRow key={m.id} m={m} bots={boot.bots} onAction={handleUiAction} />
           ))}
           {liveTools.map((t, i) => (
             <ToolCard key={`live-${i}-${t.tool}`} name={t.tool} result={t.result} pending={t.result === undefined} />
@@ -424,7 +437,7 @@ export function ChatView({
   );
 }
 
-function MessageRow({ m, bots }: { m: Message; bots: Bootstrap["bots"] }): JSX.Element | null {
+function MessageRow({ m, bots, onAction }: { m: Message; bots: Bootstrap["bots"]; onAction?: (event: UiActionEvent) => void }): JSX.Element | null {
   if (m.role === "system") {
     return <div className="compact-note">💬 이전 대화 요약으로 압축됨</div>;
   }
@@ -435,7 +448,7 @@ function MessageRow({ m, bots }: { m: Message; bots: Bootstrap["bots"] }): JSX.E
     } catch {
       /* keep raw */
     }
-    return <ToolCard name={m.tool_name ?? "?"} result={result} />;
+    return <ToolCard name={m.tool_name ?? "?"} result={result} onAction={onAction} />;
   }
   const bot = bots.find((b) => b.id === m.bot_id);
   if (m.role === "user" && !m.bot_id) {
@@ -476,7 +489,7 @@ function MessageRow({ m, bots }: { m: Message; bots: Bootstrap["bots"] }): JSX.E
   );
 }
 
-function ToolCard({ name, result, pending }: { name: string; result?: unknown; pending?: boolean }): JSX.Element {
+function ToolCard({ name, result, pending, onAction }: { name: string; result?: unknown; pending?: boolean; onAction?: (event: UiActionEvent) => void }): JSX.Element {
   const [open, setOpen] = useState(false);
   const mediaPaths: string[] = [];
   if (result && typeof result === "object") {
@@ -490,7 +503,7 @@ function ToolCard({ name, result, pending }: { name: string; result?: unknown; p
     if (r.rendered && r.code) {
       return (
         <div className="genui-wrapper">
-          <GenUICard code={r.code} />
+          <GenUICard code={r.code} onAction={onAction} />
         </div>
       );
     }

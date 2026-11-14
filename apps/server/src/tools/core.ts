@@ -521,7 +521,7 @@ registerTool({
 
 // ---------------------------------------------------------------- knowledge base (RAG)
 
-import { indexFile, indexDocument, searchKnowledge, listKnowledge, removeKnowledge } from "../knowledge.js";
+import { indexFile, indexDocument, searchKnowledgeAsync, listKnowledge, removeKnowledge } from "../knowledge.js";
 
 registerTool({
   name: "knowledge.index",
@@ -549,7 +549,7 @@ registerTool({
     required: ["query"],
   },
   async execute(ctx, args) {
-    return { results: searchKnowledge(ctx.bot.id, String(args.query ?? ""), 5) };
+    return { results: await searchKnowledgeAsync(ctx.bot.id, String(args.query ?? ""), 5) };
   },
 });
 

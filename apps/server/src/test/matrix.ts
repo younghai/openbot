@@ -866,6 +866,37 @@ let fixProviderBotConv = "";
   await fsp.rm(authData, { recursive: true, force: true }).catch(() => undefined);
 }
 
+// 31. hybrid knowledge search: Korean synonym query hits via embedding where FTS misses (optional bge-m3)
+{
+  let hasEmbedModel = false;
+  try {
+    const tags = await (await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) })).json();
+    hasEmbedModel = (tags.models ?? []).some((m: { name: string }) => m.name.startsWith("bge-m3"));
+  } catch { /* ollama absent */ }
+  if (!hasEmbedModel) {
+    record("hybrid knowledge search (optional bge-m3)", true, "skipped — bge-m3 not pulled, FTS-only fallback in effect");
+  } else {
+    const b = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "KnBot", emoji: "📚" }) });
+    const botId = b.body.id as string;
+    const kdir = path.join(dataDir, "knowledge", botId);
+    fs.mkdirSync(kdir, { recursive: true });
+    fs.writeFileSync(path.join(kdir, "recipe.md"),
+      "우리 할머니의 김치찌개 레시피. 재료: 묵은지 한포기, 돼지고기 300g, 고춧가루 두스푼, 다진 마늘. 오래 끓일수록 국물이 진해지고 시원한 맛이 난다. 겨울철 몸을 데워주는 대표적인 한국의 매운 탕 요리다.", "utf8");
+    const idx = await api("/api/knowledge/index", { method: "POST", body: JSON.stringify({ botId, path: "recipe.md" }) });
+    // 임베딩은 백그라운드 — 유의어 쿼리로 폴링 (문서에 없는 표현 "매운 국물 요리")
+    let hybridHit = false, tries = 0;
+    for (; tries < 15 && !hybridHit; tries++) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const s = await api(`/api/knowledge/search?botId=${botId}&q=${encodeURIComponent("매운 국물 요리")}`);
+      hybridHit = (s.body.results ?? []).some((r: { content: string }) => r.content.includes("김치찌개"));
+    }
+    const direct = await api(`/api/knowledge/search?botId=${botId}&q=${encodeURIComponent("김치찌개")}`);
+    record("hybrid knowledge search (optional bge-m3)",
+      idx.status === 200 && idx.body.chunks === 1 && hybridHit && (direct.body.results ?? []).length > 0,
+      `chunks=${idx.body.chunks} synonymHit=${hybridHit} (polls=${tries}) directHit=${(direct.body.results ?? []).length}`);
+  }
+}
+
 // ---------------------------------------------------------------- teardown + report
 
 async function teardown(code: number): Promise<never> {

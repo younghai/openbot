@@ -121,7 +121,7 @@ function recallMemories(botId: string, focusText?: string, scope: "dm" | "channe
   return scored.slice(0, 10).map((s2) => s2.row);
 }
 
-function systemPromptFor(bot: BotRow, computer: ComputerRow, personaOverride?: string, focusText?: string, scope: "dm" | "channel" = "dm"): string {
+async function systemPromptFor(bot: BotRow, computer: ComputerRow, personaOverride?: string, focusText?: string, scope: "dm" | "channel" = "dm"): Promise<string> {
   const memories = recallMemories(bot.id, focusText, scope);
   const skills = listSkills();
   const lines = [
@@ -135,7 +135,7 @@ function systemPromptFor(bot: BotRow, computer: ComputerRow, personaOverride?: s
     for (const m of memories) lines.push(`- ${m.content}`);
   }
   const openTasks = db.prepare("SELECT id, title, status FROM tasks WHERE assignee_bot_id=? AND status!='done' ORDER BY updated_at DESC LIMIT 10").all(bot.id) as { id: string; title: string; status: string }[];
-  const knowledge = knowledgeContext(bot.id, focusText);
+  const knowledge = await knowledgeContext(bot.id, focusText);
   if (knowledge) lines.push(knowledge);
   if (openTasks.length > 0) {
     lines.push("Your assigned tasks (report progress with the task.update tool):");
@@ -200,7 +200,7 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
   const focusText = opts.history.filter((m) => m.role === "user").slice(-3).map((m) => textContent(m.content)).join(" ");
   const convKind = opts.conversationId ? (db.prepare("SELECT kind FROM conversations WHERE id=?").get(opts.conversationId) as { kind: string } | undefined)?.kind : undefined;
   const system = [
-    systemPromptFor(bot, computer, opts.personaOverride, focusText, convKind === "channel" ? "channel" : "dm"),
+    await systemPromptFor(bot, computer, opts.personaOverride, focusText, convKind === "channel" ? "channel" : "dm"),
     ...summaryRows.map((r) => `Earlier conversation summary: ${r.content}`),
   ].join("\n\n");
 
@@ -227,7 +227,7 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
         history = historyForProvider(opts.conversationId);
         const summaryRows2 = db.prepare("SELECT content FROM messages WHERE conversation_id=? AND role='system' ORDER BY created_at").all(opts.conversationId) as { content: string }[];
         const rebuilt = [
-          systemPromptFor(bot, computer, opts.personaOverride, focusText, convKind === "channel" ? "channel" : "dm"),
+          await systemPromptFor(bot, computer, opts.personaOverride, focusText, convKind === "channel" ? "channel" : "dm"),
           ...summaryRows2.map((r) => `Earlier conversation summary: ${r.content}`),
         ].join("\n\n");
         messages.length = 0;

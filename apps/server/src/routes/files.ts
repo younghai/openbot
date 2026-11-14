@@ -108,7 +108,7 @@ filesRouter.delete("/checkpoints/:id", (c) => {
 // ---------------------------------------------------------------- knowledge (RAG)
 
 import { KNOWLEDGE_DIR } from "../knowledge.js";
-import { indexFile, listKnowledge, removeKnowledge, searchKnowledge } from "../knowledge.js";
+import { indexFile, listKnowledge, removeKnowledge, searchKnowledgeAsync } from "../knowledge.js";
 
 filesRouter.get("/knowledge", (c) => {
   const botId = c.req.query("botId") ?? "";
@@ -126,10 +126,10 @@ filesRouter.delete("/knowledge/:botId/:source", (c) => {
   return c.json({ ok: true });
 });
 
-filesRouter.get("/knowledge/search", (c) => {
+filesRouter.get("/knowledge/search", async (c) => {
   const botId = c.req.query("botId") ?? "";
   const q = c.req.query("q") ?? "";
-  return c.json({ results: searchKnowledge(botId, q, 5) });
+  return c.json({ results: await searchKnowledgeAsync(botId, q, 5) });
 });
 
 // channel status endpoint (P1-H)

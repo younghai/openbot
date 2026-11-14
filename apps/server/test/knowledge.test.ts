@@ -7,6 +7,12 @@ describe("chunkDocument", () => {
     expect(chunkDocument("short")).toEqual([]);
   });
 
+  it("chunks a short doc exactly once (no overlap loop)", () => {
+    // 회귀: 178자 문서가 겹침 재진입으로 501청크까지 반복 생성되던 버그
+    const doc = "우리 할머니의 김치찌개 레시피. 재료: 묵은지 한포기, 돼지고기, 고춧가루. 오래 끓일수록 국물이 진해진다.";
+    expect(chunkDocument(doc)).toHaveLength(1);
+  });
+
   it("chunks text larger than CHUNK_SIZE", () => {
     const long = "a".repeat(2000);
     const chunks = chunkDocument(long);

@@ -21,7 +21,68 @@ export function Settings({ boot, refresh }: { boot: Bootstrap; refresh: () => vo
           </div>
         </div>
       ))}
+      <SkillProposalsSection refresh={refresh} />
     </div>
+  );
+}
+
+/** 🧠 자동 학습: 대화에서 증류된 스킬 제안을 검토·승인하면 스킬 라이브러리에 반영된다. */
+function SkillProposalsSection({ refresh }: { refresh: () => void }): JSX.Element {
+  const [pending, setPending] = useState<{ id: string; name: string; description: string; content: string; created_at: number }[]>([]);
+  const [history, setHistory] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [note, setNote] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
+
+  const load = () => {
+    api.skillProposals("pending").then(setPending).catch(() => undefined);
+    api.skillProposals().then((all) => setHistory(all.filter((p) => p.status !== "pending").slice(0, 10))).catch(() => undefined);
+  };
+  useEffect(load, []);
+
+  return (
+    <>
+      <h2>🧠 스킬 학습</h2>
+      <p className="muted">
+        채팅 화면의 "이 대화에서 스킬 배우기"로 완성된 작업 절차를 제안받습니다. 승인하면 위 스킬 라이브러리에 반영되어 봇이 <code>skills.read</code>로 사용합니다. 로컬 모델로 증류 — 외부 전송 없음.
+      </p>
+      {note && <p className="test-result">{note}</p>}
+      {pending.length === 0 && <div className="card muted">검토할 제안이 없습니다.</div>}
+      {pending.map((p) => (
+        <div key={p.id} className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <code>{p.name}</code> <span className="badge warn">제안</span>
+              <div className="muted small">{p.description}</div>
+            </div>
+            <div className="row">
+              <button className="btn primary" onClick={async () => {
+                const r = await api.approveSkillProposal(p.id).catch((e) => ({ ok: false, error: String(e.message) }));
+                setNote(r.ok ? `✅ ${p.name} 스킬로 반영됨` : r.error ?? "실패");
+                load(); refresh();
+              }}>승인·반영</button>
+              <button className="btn danger" onClick={async () => {
+                const r = await api.rejectSkillProposal(p.id).catch(() => ({ ok: false }));
+                setNote(r.ok ? `${p.name} 거부됨` : "거부 실패");
+                load();
+              }}>거부</button>
+              <button className="btn small" onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? "접기" : "내용 보기"}</button>
+            </div>
+          </div>
+          {open === p.id && <pre className="approval-args">{p.content}</pre>}
+        </div>
+      ))}
+      {history.length > 0 && (
+        <>
+          <h3>처리 이력</h3>
+          {history.map((h) => (
+            <div key={h.id} className="card row">
+              <span className="small"><code>{h.name}</code></span>
+              <span className={`badge ${h.status === "approved" ? "ok" : "off"}`}>{h.status === "approved" ? "반영됨" : "거부"}</span>
+            </div>
+          ))}
+        </>
+      )}
+    </>
   );
 }
 

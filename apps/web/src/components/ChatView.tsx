@@ -56,6 +56,7 @@ export function ChatView({
   const [callMode, setCallMode] = useState(false);
   const [listening, setListening] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [skillNote, setSkillNote] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<Approval | null>(null);
   const [thinkingChars, setThinkingChars] = useState(0);
@@ -313,6 +314,19 @@ export function ChatView({
               {bot.status === "paused" ? "▶" : "⏸"}
             </button>
           )}
+          {bot && conv.kind === "dm" && (
+            <button
+              className="icon-btn"
+              title="이 대화에서 스킬 배우기 — 완성된 절차를 로컬 모델로 증류해 제안"
+              onClick={async () => {
+                setSkillNote("분석 중…");
+                const r = await api.proposeSkill(conversationId).catch((e) => ({ ok: false, error: String(e.message ?? e) }) as const);
+                setSkillNote(r.ok ? `제안 완료: ${r.proposal?.name} — 설정 → 스킬 학습에서 검토` : r.error ?? "제안 실패");
+                setTimeout(() => setSkillNote(""), 6000);
+              }}
+            >🎓</button>
+          )}
+          {skillNote && <span className="muted small">{skillNote}</span>}
           {bot && <button className={`icon-btn ${speakOn ? "on" : ""}`} title="응답 읽어주기" onClick={() => setSpeakOn(!speakOn)}>🔊</button>}
           {bot && <button className={`icon-btn call ${callMode ? "on" : ""}`} title="통화" onClick={toggleCall}>📞</button>}
           {bot && <button className={`icon-btn ${showMemory ? "on" : ""}`} title="메모리" onClick={() => setShowMemory(!showMemory)}>🧠</button>}

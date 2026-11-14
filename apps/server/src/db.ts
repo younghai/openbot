@@ -58,7 +58,9 @@ CREATE TABLE IF NOT EXISTS routines (
   enabled INTEGER NOT NULL DEFAULT 1,
   last_run_at INTEGER,
   failure_count INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'act',        -- act = 실행 | report = 보고만 (check-in)
+  goal TEXT                                 -- Until: 목표 문장 — 봇이 달성 판정 시 루틴 자동 완료
 );
 CREATE TABLE IF NOT EXISTS computers (
   id TEXT PRIMARY KEY,
@@ -160,6 +162,14 @@ CREATE TABLE IF NOT EXISTS approvals (
   detail TEXT,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS approval_allows (
+  scope TEXT NOT NULL,             -- 'conversation' = 이 대화에서 허용 | 'bot' = 이 봇에서 항상 허용
+  conversation_id TEXT NOT NULL DEFAULT '',  -- '' when scope='bot'
+  bot_id TEXT NOT NULL,
+  tool TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (scope, conversation_id, bot_id, tool)
+);
 `);
 
 // approval policy seed: read-only tools flow, side-effecting tools ask first
@@ -233,6 +243,8 @@ try { db.exec("ALTER TABLE memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'dm'"
 try { db.exec("ALTER TABLE conversations ADD COLUMN instructions TEXT"); } catch { }
 try { db.exec("ALTER TABLE conversations ADD COLUMN responder_mode TEXT NOT NULL DEFAULT 'all'"); } catch { }
 try { db.exec("ALTER TABLE channel_members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"); } catch { }
+try { db.exec("ALTER TABLE routines ADD COLUMN mode TEXT NOT NULL DEFAULT 'act'"); } catch { }
+try { db.exec("ALTER TABLE routines ADD COLUMN goal TEXT"); } catch { }
 try { db.exec("ALTER TABLE routines ADD COLUMN enabled2 INTEGER"); } catch { }
 CREATE_TABLE_IF_NOT_EXISTS_usage_caps: {
   db.exec(`CREATE TABLE IF NOT EXISTS usage_caps (
@@ -273,6 +285,7 @@ export interface ToolSourceRow {
 export interface RoutineRow {
   id: string; bot_id: string; name: string; cron: string; prompt: string;
   enabled: number; last_run_at: number | null; failure_count: number; created_at: number;
+  mode: string; goal: string | null;
 }
 export interface JobRow {
   id: string; bot_id: string; conversation_id: string; prompt: string; source: string;

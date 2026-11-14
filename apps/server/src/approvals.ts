@@ -120,6 +120,42 @@ function getApproval(id: string): ApprovalRow | undefined {
   return db.prepare("SELECT * FROM approvals WHERE id=?").get(id) as unknown as ApprovalRow | undefined;
 }
 
+// ---------------------------------------------------------------- scoped allows (CopilotKit OpenBot 패턴)
+
+/**
+ * 승인 결정의 지속(CopilotKit OpenBot approvals.md 패턴):
+ * - once: 이번만 (기존 동작)
+ * - conversation: 같은 대화·같은 봇·같은 도구는 더 묻지 않음
+ * - always: 같은 봇·같은 도구는 어디서든 더 묻지 않음 (사용자 규칙으로 저장)
+ * 잠금 프리셋은 "가장 엄격한 규칙이 이긴다" 원칙으로 스코프 허용을 무시한다.
+ */
+export type AllowScope = "once" | "conversation" | "always";
+
+export function scopedAllowActive(botId: string, conversationId: string | null, tool: string): string | null {
+  if (currentPolicyPreset() === "locked") return null;
+  const conv = conversationId ?? "";
+  const row = db.prepare(
+    "SELECT scope FROM approval_allows WHERE tool=? AND bot_id=? AND (scope='bot' OR (scope='conversation' AND conversation_id=?)) LIMIT 1"
+  ).get(tool, botId, conv) as { scope: string } | undefined;
+  return row?.scope ?? null;
+}
+
+export interface AllowRow {
+  scope: string;
+  conversation_id: string;
+  bot_id: string;
+  tool: string;
+  created_at: number;
+}
+
+export function listApprovalAllows(): AllowRow[] {
+  return db.prepare("SELECT * FROM approval_allows ORDER BY created_at DESC LIMIT 200").all() as unknown as AllowRow[];
+}
+
+export function removeApprovalAllow(scope: string, conversationId: string, botId: string, tool: string): void {
+  db.prepare("DELETE FROM approval_allows WHERE scope=? AND conversation_id=? AND bot_id=? AND tool=?").run(scope, conversationId, botId, tool);
+}
+
 export function listApprovals(status?: string): ApprovalRow[] {
   if (status) {
     return db.prepare("SELECT * FROM approvals WHERE status=? ORDER BY created_at DESC LIMIT 200").all(status) as unknown as ApprovalRow[];
@@ -127,11 +163,20 @@ export function listApprovals(status?: string): ApprovalRow[] {
   return db.prepare("SELECT * FROM approvals ORDER BY created_at DESC LIMIT 200").all() as unknown as ApprovalRow[];
 }
 
-export function decideApproval(id: string, decision: "approved" | "denied"): { ok: boolean; error?: string } {
+export function decideApproval(id: string, decision: "approved" | "denied", allowScope: AllowScope = "once"): { ok: boolean; error?: string } {
   const row = getApproval(id);
   if (!row) return { ok: false, error: "approval not found" };
   if (row.status !== "pending") return { ok: false, error: `approval already ${row.status}` };
-  db.prepare("UPDATE approvals SET status=?, decided_at=? WHERE id=? AND status='pending'").run(decision, now(), id);
+  db.prepare("UPDATE approvals SET status=?, decided_at=?, detail=? WHERE id=? AND status='pending'").run(decision, now(), allowScope !== "once" ? `allowed: ${allowScope}` : null, id);
+  if (decision === "approved" && allowScope !== "once" && row.bot_id) {
+    if (allowScope === "conversation" && row.conversation_id) {
+      db.prepare("INSERT OR IGNORE INTO approval_allows (scope, conversation_id, bot_id, tool, created_at) VALUES ('conversation',?,?,?,?)")
+        .run(row.conversation_id, row.bot_id, row.tool, now());
+    } else if (allowScope === "always") {
+      db.prepare("INSERT OR IGNORE INTO approval_allows (scope, conversation_id, bot_id, tool, created_at) VALUES ('bot','',?,?,?)")
+        .run(row.bot_id, row.tool, now());
+    }
+  }
   const waiter = waiters.get(id);
   if (waiter) {
     clearTimeout(waiter.timer);

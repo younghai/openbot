@@ -103,6 +103,8 @@ export interface Routine {
   last_run_at: number | null;
   failure_count: number;
   created_at: number;
+  mode?: "act" | "report";
+  goal?: string | null;
 }
 
 export interface Job {

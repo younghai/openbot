@@ -211,9 +211,41 @@ let alphaId = "", alphaConv = "";
   const deniedRes = deniedTool ? JSON.parse(deniedTool.tool_result) : null;
   const audit = await api("/api/audit?limit=50");
   const denyRow = (audit.body as any[]).find((a) => a.decision === "deny" && a.tool === "terminal.exec" && /denied/.test(a.detail ?? ""));
+  // 거부 문구는 하나의 목소리 패턴(CopilotKit DECLINED_BY_PERSON): 누가 결정했는지 + 우회 금지 지시
+  const declinedWell = String(deniedRes?.error ?? "").includes("거부") && String(deniedRes?.error ?? "").includes("우회");
   record("approval queue: deny blocks execution + audits",
-    dn.status === 200 && d2 === "done" && String(deniedRes?.error ?? "").includes("denied") && Boolean(denyRow),
-    `deny=${dn.status} job=${d2} toolResult="${String(deniedRes?.error).slice(0, 50)}" auditDeny=${Boolean(denyRow)}`);
+    dn.status === 200 && d2 === "done" && declinedWell && Boolean(denyRow),
+    `deny=${dn.status} job=${d2} declined-note=${declinedWell} auditDeny=${Boolean(denyRow)}`);
+
+  // 3d. scoped approval: '이 봇에서 항상' 승인 후 같은 도구는 더 묻지 않는다
+  {
+    const p3 = await api(`/api/conversations/${gConv}/messages`, { method: "POST", body: JSON.stringify({ content: "terminal 로 run 해줘" }) });
+    await waitFor(async () => {
+      const a = await api("/api/approvals?status=pending");
+      return Array.isArray(a.body) && a.body.length > 0;
+    }, 15_000, "third approval appears");
+    const row3 = ((await api("/api/approvals?status=pending")).body as any[])[0];
+    const apScope = await api(`/api/approvals/${row3.id}/approve`, { method: "POST", body: JSON.stringify({ scope: "always" }) });
+    const d3 = await waitJobDone(p3.body.jobId, 30_000);
+    const p4 = await api(`/api/conversations/${gConv}/messages`, { method: "POST", body: JSON.stringify({ content: "terminal 로 run 해줘" }) });
+    const d4 = await waitJobDone(p4.body.jobId, 30_000);
+    // 4번째 실행은 승인 요청 없이 바로 통과해야 한다
+    let spuriousApproval = false;
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 800));
+      const pend = ((await api("/api/approvals?status=pending")).body as any[]).filter((a: any) => a.tool === "terminal.exec");
+      if (pend.length > 0) spuriousApproval = true;
+    }
+    const allows = await api("/api/approval-allows");
+    const rule = (allows.body as any[]).find((a) => a.tool === "terminal.exec" && a.scope === "bot");
+    const audit4 = await api("/api/audit?limit=30");
+    const scopedAllowRow = (audit4.body as any[]).find((a) => a.decision === "allow" && /allowed: bot/.test(a.detail ?? ""));
+    const msgs4 = (await messagesOf(gConv)).filter((m) => m.role === "tool" && m.tool_name === "terminal.exec");
+    const last4 = msgs4.length > 0 ? JSON.parse(msgs4[msgs4.length - 1].tool_result) : null;
+    record("scoped approval: '이 봇에서 항상' 재질문 없음",
+      apScope.status === 200 && d3 === "done" && d4 === "done" && !spuriousApproval && Boolean(rule) && Boolean(scopedAllowRow) && last4?.exitCode === 0,
+      `ap=${apScope.status} d3=${d3} d4=${d4} askedAgain=${spuriousApproval} rule=${Boolean(rule)} audit=${Boolean(scopedAllowRow)} exit=${last4?.exitCode}`);
+  }
 
   autoApprove = true;
 }
@@ -351,11 +383,13 @@ async function dbHasEncryptedCredentials(): Promise<boolean> {
 
 // 15. BYO model provider (fake OpenAI-compatible server)
 let fixProviderBotConv = "";
+let fixProviderId = "";
 {
   const p = await api("/api/providers", {
     method: "POST",
     body: JSON.stringify({ name: "fixture", kind: "openai-compatible", baseUrl: `http://127.0.0.1:${fixture.port}/v1`, apiKey: "fixture-key", model: "fixture-1" }),
   });
+  fixProviderId = p.body.id as string;
   const b = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "FixBot", emoji: "🧪", providerId: p.body.id }) });
   fixProviderBotConv = b.body.conversationId;
   const s = await send(fixProviderBotConv, "실제 HTTP 프로바이더 경로 테스트");
@@ -895,6 +929,39 @@ let fixProviderBotConv = "";
       idx.status === 200 && idx.body.chunks === 1 && hybridHit && (direct.body.results ?? []).length > 0,
       `chunks=${idx.body.chunks} synonymHit=${hybridHit} (polls=${tries}) directHit=${(direct.body.results ?? []).length}`);
   }
+}
+
+// 32. skill proposals: 대화 증류 → 검토 → 승인 시 skills 라이브러리 반영 (자체호스팅 automatic learning)
+{
+  const b = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "LearnBot", emoji: "🎓", providerId: fixProviderId }) });
+  const lConv = b.body.conversationId as string;
+  await send(lConv, "skilldemo 로 주간 보고서 자동화해줘");
+  await send(lConv, "skilldemo 방금 그 절차로 다시 해줘");
+  const prop = await api("/api/skill-proposals", { method: "POST", body: JSON.stringify({ conversationId: lConv }) });
+  const proposal = prop.body?.proposal as { id: string; name: string } | undefined;
+  const listed = await api("/api/skill-proposals?status=pending");
+  const inList = (listed.body as any[]).find((p) => p.id === proposal?.id);
+  const ap = proposal ? await api(`/api/skill-proposals/${proposal.id}/approve`, { method: "POST" }) : { status: 0 };
+  const seeded = proposal ? fs.existsSync(path.join(dataDir, "skills", proposal.name, "SKILL.md")) : false;
+  const skillsApi = await api("/api/skills");
+  const visible = (skillsApi.body as any[]).find((s) => s.name === proposal?.name);
+  const after = await api("/api/skill-proposals?status=pending");
+  record("skill proposals: distill → review → approve seeds library",
+    prop.status === 200 && Boolean(proposal) && prop.body.proposal.name === "weekly-report-skill" && Boolean(inList) && ap.status === 200 && seeded && Boolean(visible) && (after.body as any[]).length === 0,
+    `prop=${prop.status} name=${prop.body?.proposal?.name} approve=${ap.status} seeded=${seeded} botSees=${Boolean(visible)}`);
+}
+
+// 33. routine mode/goal: 보고만 모드와 목표(Until)가 저장된다
+{
+  const b = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "GoalBot", emoji: "🎯" }) });
+  const r = await api("/api/routines", { method: "POST", body: JSON.stringify({
+    botId: b.body.id, cron: "0 8 * * 1-5", prompt: "릴리스 노트 상황 확인", name: "릴리스 감시", mode: "report", goal: "릴리스 노트 초안 승인",
+  }) });
+  const boot2 = await api("/api/bootstrap");
+  const row = (boot2.body.routines as any[]).find((x) => x.id === r.body.id);
+  record("routine mode+goal stored (check-in / until)",
+    r.status === 201 && row?.mode === "report" && row?.goal === "릴리스 노트 초안 승인",
+    `create=${r.status} mode=${row?.mode} goal="${row?.goal}"`);
 }
 
 // ---------------------------------------------------------------- teardown + report

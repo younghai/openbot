@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db, uid, now } from "../db.js";
 import { encrypt } from "../crypto.js";
 import { refreshSource, invalidateSource } from "../tools/dynamic.js";
-import { listApprovals, decideApproval, listToolPolicies, POLICY_PRESETS, applyPolicyPreset, currentPolicyPreset } from "../approvals.js";
+import { listApprovals, decideApproval, listToolPolicies, POLICY_PRESETS, applyPolicyPreset, currentPolicyPreset, listApprovalAllows, removeApprovalAllow } from "../approvals.js";
 import { catalogEntries } from "../tool-catalog.js";
 
 export const sourcesRouter = new Hono();
@@ -76,13 +76,21 @@ sourcesRouter.delete("/tool-sources/:id", (c) => {
 // ---------------------------------------------------------------- tool approvals + policies
 
 sourcesRouter.get("/approvals", (c) => c.json(listApprovals(c.req.query("status"))));
-sourcesRouter.post("/approvals/:id/approve", (c) => {
-  const r = decideApproval(c.req.param("id"), "approved");
+sourcesRouter.post("/approvals/:id/approve", async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { scope?: string };
+  const scope = body.scope === "conversation" || body.scope === "always" ? body.scope : "once";
+  const r = decideApproval(c.req.param("id"), "approved", scope);
   return c.json(r, r.ok ? 200 : 409);
 });
 sourcesRouter.post("/approvals/:id/deny", (c) => {
   const r = decideApproval(c.req.param("id"), "denied");
   return c.json(r, r.ok ? 200 : 409);
+});
+// 스코프 허용 규칙 (이 대화에서 / 이 봇에서 항상) — 사용자가 검토·제거
+sourcesRouter.get("/approval-allows", (c) => c.json(listApprovalAllows()));
+sourcesRouter.delete("/approval-allows", (c) => {
+  removeApprovalAllow(c.req.query("scope") ?? "", c.req.query("conversationId") ?? "", c.req.query("botId") ?? "", c.req.query("tool") ?? "");
+  return c.json({ ok: true });
 });
 sourcesRouter.get("/tool-policies", (c) => c.json(listToolPolicies()));
 sourcesRouter.get("/tool-policies/presets", (c) => c.json({ presets: POLICY_PRESETS, current: currentPolicyPreset() }));

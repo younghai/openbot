@@ -7,6 +7,8 @@ export function Routines({ boot, refresh }: { boot: Bootstrap; refresh: () => vo
   const [name, setName] = useState("");
   const [cron, setCron] = useState("0 9 * * *");
   const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState<"act" | "report">("act");
+  const [goal, setGoal] = useState("");
 
   return (
     <div className="page">
@@ -29,14 +31,22 @@ export function Routines({ boot, refresh }: { boot: Bootstrap; refresh: () => vo
           <input value={cron} onChange={(e) => setCron(e.target.value)} placeholder="*/5 * * * * 또는 0 9 * * *" />
           <label>프롬프트</label>
           <textarea rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="오늘 할 일 정리해서 알려줘" />
+          <label>실행 방식</label>
+          <select value={mode} onChange={(e) => setMode(e.target.value as "act" | "report")}>
+            <option value="act">실행 (도구 사용 가능)</option>
+            <option value="report">보고만 (check-in — 읽기·요약만)</option>
+          </select>
+          <label>목표 (비우면 계속 반복)</label>
+          <input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="예: 릴리스 노트 초안이 승인될 때까지 — 달성되면 자동 중지" />
         </div>
         <button
           className="btn primary"
           disabled={!botId || !cron.trim() || !prompt.trim()}
           onClick={async () => {
-            await api.createRoutine({ botId, cron, prompt, name: name || cron });
+            await api.createRoutine({ botId, cron, prompt, name: name || cron, mode, goal: goal || undefined });
             setName("");
             setPrompt("");
+            setGoal("");
             refresh();
           }}
         >
@@ -56,10 +66,13 @@ export function Routines({ boot, refresh }: { boot: Bootstrap; refresh: () => vo
               <code>{r.cron}</code>{" "}
               <span className={`badge ${r.enabled ? "ok" : "off"}`}>{r.enabled ? "켜짐" : "꺼짐"}</span>
               {r.failure_count > 0 && <span className="badge warn">실패 {r.failure_count}</span>}
+              {r.mode === "report" && <span className="badge">보고만</span>}
+              {r.goal && <span className="badge warn">🎯 목표</span>}
               <div className="muted small">
                 {bot?.name} · 마지막 실행: {r.last_run_at ? new Date(r.last_run_at).toLocaleString("ko-KR") : "없음"}
               </div>
               <div className="small">{r.prompt}</div>
+              {r.goal && <div className="muted small">🎯 {r.goal} — 봇이 달성 판정 시 자동 중지</div>}
             </div>
             <div className="row">
               <button className="btn" onClick={async () => { await api.patchRoutine(r.id, { enabled: !r.enabled }); refresh(); }}>

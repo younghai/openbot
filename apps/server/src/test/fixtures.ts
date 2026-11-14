@@ -112,6 +112,19 @@ export function startFixtures(): Promise<{ server: http.Server; port: number; ca
             tool_calls: [{ id: id(), type: "function", function: { name: "browser.open", arguments: JSON.stringify({ url: "https://example.com" }) } }],
           });
         }
+        if (text.includes("skilldemo")) {
+          return respond({
+            role: "assistant",
+            content: [
+              "NAME: weekly-report-skill",
+              "DESCRIPTION: 주간 보고서를 생성하는 절차",
+              "STEPS:",
+              "1. search.web 로 지난 주 키워드 검색",
+              "2. 결과를 워크스페이스에 정리",
+              "3. ui.render 로 요약 차트 생성",
+            ].join("\n"),
+          });
+        }
         if (text.includes("pycode")) {
           return respond({
             role: "assistant",

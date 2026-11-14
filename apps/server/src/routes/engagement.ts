@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db, uid, now } from "../db.js";
+import { proposeSkillFromConversation, listProposals, approveProposal, rejectProposal } from "../skill-proposals.js";
 
 /**
  * Engagement routes (Open WebUI pattern): message feedback (👍/👎),
@@ -77,4 +78,26 @@ engagementRouter.patch("/bots/:id/hide", async (c) => {
   const body = await c.req.json<{ hidden?: boolean }>();
   db.prepare("UPDATE bots SET hidden=? WHERE id=?").run(body.hidden ? 1 : 0, c.req.param("id"));
   return c.json({ ok: true, hidden: body.hidden ? 1 : 0 });
+});
+
+// ---------------------------------------------------------------- skill proposals (자체호스팅 automatic learning)
+
+engagementRouter.post("/skill-proposals", async (c) => {
+  const body = await c.req.json<{ conversationId?: string }>();
+  if (!body.conversationId) return c.json({ error: "conversationId required" }, 400);
+  const r = await proposeSkillFromConversation(String(body.conversationId));
+  return c.json(r, r.ok ? 200 : 400);
+});
+
+engagementRouter.get("/skill-proposals", (c) => c.json(listProposals(c.req.query("status") ?? undefined)));
+
+engagementRouter.post("/skill-proposals/:id/approve", (c) => {
+  const r = approveProposal(c.req.param("id"));
+  return c.json(r, r.ok ? 200 : 409);
+});
+
+engagementRouter.post("/skill-proposals/:id/reject", async (c) => {
+  const body = await c.req.json<{ reason?: string }>().catch(() => ({}) as { reason?: string });
+  const r = rejectProposal(c.req.param("id"), body.reason);
+  return c.json(r, r.ok ? 200 : 409);
 });

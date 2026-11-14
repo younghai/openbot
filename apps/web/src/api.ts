@@ -72,6 +72,12 @@ export const api = {
   sendFeedback: (messageId: string, conversationId: string, botId: string | null, rating: "up" | "down") =>
     req<{ ok: boolean; rating?: string; removed?: boolean }>("/feedback", { method: "POST", body: JSON.stringify({ messageId, conversationId, botId, rating }) }),
   feedbackStats: () => req<{ up: number; down: number; satisfaction: number | null }>("/feedback/stats"),
+  proposeSkill: (conversationId: string) =>
+    req<{ ok: boolean; error?: string; proposal?: { id: string; name: string; description: string; content: string } }>("/skill-proposals", { method: "POST", body: JSON.stringify({ conversationId }) }),
+  skillProposals: (status?: string) =>
+    req<{ id: string; bot_id: string | null; name: string; description: string; content: string; status: string; reason: string | null; created_at: number }[]>(`/skill-proposals${status ? `?status=${status}` : ""}`),
+  approveSkillProposal: (id: string) => req<{ ok: boolean; error?: string }>(`/skill-proposals/${id}/approve`, { method: "POST" }),
+  rejectSkillProposal: (id: string) => req<{ ok: boolean; error?: string }>(`/skill-proposals/${id}/reject`, { method: "POST", body: JSON.stringify({}) }),
   prompts: () => req<Prompt[]>("/prompts"),
   createPrompt: (title: string, content: string) => req<{ id: string }>("/prompts", { method: "POST", body: JSON.stringify({ title, content }) }),
   deletePrompt: (id: string) => req<{ ok: boolean }>(`/prompts/${id}`, { method: "DELETE" }),
@@ -109,7 +115,11 @@ export const api = {
   jobs: () => req<Job[]>("/queue"),
   cancelJob: (id: string) => req<{ ok: boolean }>(`/queue/${id}/cancel`, { method: "POST" }),
   approvals: (status?: string) => req<Approval[]>(`/approvals${status ? `?status=${status}` : ""}`),
-  approveTool: (id: string) => req<{ ok: boolean; error?: string }>(`/approvals/${id}/approve`, { method: "POST" }),
+  approveTool: (id: string, scope?: "once" | "conversation" | "always") =>
+    req<{ ok: boolean; error?: string }>(`/approvals/${id}/approve`, { method: "POST", body: JSON.stringify({ scope: scope ?? "once" }) }),
+  approvalAllows: () => req<{ scope: string; conversation_id: string; bot_id: string; tool: string; created_at: number }[]>("/approval-allows"),
+  removeApprovalAllow: (scope: string, conversationId: string, botId: string, tool: string) =>
+    req<{ ok: boolean }>(`/approval-allows?scope=${encodeURIComponent(scope)}&conversationId=${encodeURIComponent(conversationId)}&botId=${encodeURIComponent(botId)}&tool=${encodeURIComponent(tool)}`, { method: "DELETE" }),
   denyTool: (id: string) => req<{ ok: boolean; error?: string }>(`/approvals/${id}/deny`, { method: "POST" }),
   audit: (limit = 200) => req<AuditRow[]>(`/audit?limit=${limit}`),
 
@@ -133,7 +143,7 @@ export const api = {
   deleteToolSource: (id: string) => req<{ ok: boolean }>(`/tool-sources/${id}`, { method: "DELETE" }),
   toolCatalog: () => req<CatalogEntry[]>("/tool-catalog"),
 
-  createRoutine: (body: { botId: string; cron: string; prompt: string; name?: string }) =>
+  createRoutine: (body: { botId: string; cron: string; prompt: string; name?: string; mode?: "act" | "report"; goal?: string }) =>
     req<{ id: string }>("/routines", { method: "POST", body: JSON.stringify(body) }),
   patchRoutine: (id: string, body: Record<string, unknown>) => req<{ ok: boolean }>(`/routines/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteRoutine: (id: string) => req<{ ok: boolean }>(`/routines/${id}`, { method: "DELETE" }),

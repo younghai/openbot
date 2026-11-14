@@ -9,10 +9,12 @@ export function Inbox({ boot }: { boot: Bootstrap }): JSX.Element {
   const [err, setErr] = useState<string | null>(null);
   const [presets, setPresets] = useState<PolicyPreset[]>([]);
   const [currentPreset, setCurrentPreset] = useState<string>("");
+  const [allows, setAllows] = useState<{ scope: string; conversation_id: string; bot_id: string; tool: string; created_at: number }[]>([]);
 
   const load = () => {
     api.approvals().then(setRows).catch((e) => setErr(String(e.message ?? e)));
     api.policyPresets().then((p) => { setPresets(p.presets); setCurrentPreset(p.current); }).catch(() => undefined);
+    api.approvalAllows().then(setAllows).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -26,9 +28,9 @@ export function Inbox({ boot }: { boot: Bootstrap }): JSX.Element {
   const pending = rows.filter((r) => r.status === "pending");
   const decided = rows.filter((r) => r.status !== "pending").slice(0, 20);
 
-  const decide = async (id: string, kind: "approve" | "deny") => {
+  const decide = async (id: string, kind: "approve" | "deny", scope?: "conversation" | "always") => {
     try {
-      const r = kind === "approve" ? await api.approveTool(id) : await api.denyTool(id);
+      const r = kind === "approve" ? await api.approveTool(id, scope) : await api.denyTool(id);
       if (!r.ok && r.error) setErr(r.error);
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e));
@@ -74,12 +76,29 @@ export function Inbox({ boot }: { boot: Bootstrap }): JSX.Element {
             <div className="muted small">{botName(r.bot_id)} · {new Date(r.created_at).toLocaleTimeString()}</div>
             <pre className="approval-args">{r.args}</pre>
           </div>
-          <div className="row">
-            <button className="btn primary" onClick={() => decide(r.id, "approve")}>승인</button>
+          <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end", gap: 6 }}>
+            <button className="btn primary" onClick={() => decide(r.id, "approve")}>이번만 허용</button>
+            <button className="btn" title="같은 대화·같은 봇·같은 도구는 더 묻지 않음" onClick={() => decide(r.id, "approve", "conversation")}>이 대화에서 허용</button>
+            <button className="btn" title="이 봇의 이 도구는 어디서든 더 묻지 않음 (아래 규칙 목록에 저장)" onClick={() => decide(r.id, "approve", "always")}>이 봇에서 항상</button>
             <button className="btn danger" onClick={() => decide(r.id, "deny")}>거부</button>
           </div>
         </div>
       ))}
+      {allows.length > 0 && (
+        <>
+          <h3>저장된 허용 규칙</h3>
+          <p className="muted small">스코프 승인으로 저장된 규칙입니다. 잠금 프리셋에서는 무시됩니다.</p>
+          {allows.map((a) => (
+            <div key={`${a.scope}:${a.conversation_id}:${a.bot_id}:${a.tool}`} className="card row">
+              <div className="small">
+                <code>{a.tool}</code> · {botName(a.bot_id)}{" "}
+                <span className={`badge ${a.scope === "bot" ? "ok" : ""}`}>{a.scope === "bot" ? "이 봇에서 항상" : "이 대화에서"}</span>
+              </div>
+              <button className="btn small danger" onClick={async () => { await api.removeApprovalAllow(a.scope, a.conversation_id, a.bot_id, a.tool).catch(() => undefined); load(); }}>제거</button>
+            </div>
+          ))}
+        </>
+      )}
       {decided.length > 0 && (
         <>
           <h3>최근 결정</h3>

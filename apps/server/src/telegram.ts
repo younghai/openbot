@@ -112,9 +112,12 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
     }
     const [, kind, id] = String(cb.data).split(":");
     await tg("answerCallbackQuery", { callback_query_id: cb.id }).catch(() => undefined);
-    if (kind === "ap" || kind === "dn") {
-      const r = decideApproval(id, kind === "ap" ? "approved" : "denied");
-      await tg("sendMessage", { chat_id: cb.message?.chat.id, text: r.ok ? (kind === "ap" ? "✅ 승인했습니다." : "🚫 거부했습니다.") : `이미 처리됨: ${r.error}` }).catch(() => undefined);
+    if (kind === "ap" || kind === "ac" || kind === "aa" || kind === "dn") {
+      const decision = kind === "dn" ? "denied" : "approved";
+      const scope = kind === "ac" ? "conversation" : kind === "aa" ? "always" : "once";
+      const r = decideApproval(id, decision as "approved" | "denied", scope);
+      const label = kind === "ap" ? "✅ 승인했습니다." : kind === "ac" ? "✅ 이 대화에서 허용했습니다." : kind === "aa" ? "✅ 이 봇에서 항상 허용했습니다." : "🚫 거부했습니다.";
+      await tg("sendMessage", { chat_id: cb.message?.chat.id, text: r.ok ? label : `이미 처리됨: ${r.error}` }).catch(() => undefined);
     }
   }
 }
@@ -149,8 +152,11 @@ function wireOutbound(): void {
           chat_id: chatId,
           text: `🔒 도구 승인 요청: ${approval.tool}\n${(approval.args ?? "").slice(0, 300)}`,
           reply_markup: { inline_keyboard: [[
-            { text: "승인", callback_data: `tg:ap:${approval.id}` },
-            { text: "거부", callback_data: `tg:dn:${approval.id}` },
+            { text: "✅ 이번만", callback_data: `tg:ap:${approval.id}` },
+            { text: "💬 이 대화", callback_data: `tg:ac:${approval.id}` },
+            { text: "📌 이 봇 항상", callback_data: `tg:aa:${approval.id}` },
+          ], [
+            { text: "🚫 거부", callback_data: `tg:dn:${approval.id}` },
           ]] },
         }).catch(() => undefined);
       }

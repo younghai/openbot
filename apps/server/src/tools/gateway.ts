@@ -1,6 +1,6 @@
 import path from "node:path";
 import { db, uid, now, type BotRow, type ComputerRow } from "../db.js";
-import { policyFor, requestApproval } from "../approvals.js";
+import { policyFor, requestApproval, scopedAllowActive } from "../approvals.js";
 
 export interface ToolContext {
   bot: BotRow;
@@ -166,13 +166,25 @@ interface GateResult {
   reason?: string;
 }
 
+/** 사용자 거부를 모델에게 전달하는 하나의 문장 (CopilotKit approval-outcomes DECLINED_BY_PERSON 패턴):
+ * 사실(누가 결정했는지) + 지시(우회 금지·보고 방법)를 함께 주어 모델이 다른 길을 찾지 않게 한다. */
+const DECLINED_BY_PERSON_NOTE =
+  "사용자가 이 도구 실행 승인을 거부했습니다. 이것은 정책이나 보안 제약이 아니라 사용자 본인의 결정입니다. " +
+  "사용자가 말로 다시 요청하지 않는 한 이 작업이나 동등한 우회 방법을 시도하지 말고, 거부되어 실행하지 못했다고 그대로 보고하세요.";
+
 async function gateApproval(ctx: ToolContext, name: string, args: Record<string, unknown>): Promise<GateResult> {
   if (policyFor(name) !== "ask") return { allowed: true, approved: false };
+  // 스코프 허용(이 대화에서/이 봇에서 항상)이 있으면 묻지 않고 통과 — 잠금 프리셋은 무시(가장 엄격한 규칙이 이긴다)
+  const scope = scopedAllowActive(ctx.bot.id, ctx.conversationId, name);
+  if (scope) {
+    audit(ctx, name, args, "allow", `policy check passed (allowed: ${scope})`);
+    return { allowed: true, approved: true };
+  }
   const verdict = await requestApproval(ctx, name, args);
   if (verdict === "approved") return { allowed: true, approved: true };
   const reason =
-    verdict === "denied" ? `tool '${name}' blocked: user denied approval`
-    : verdict === "expired" ? `tool '${name}' blocked: approval timed out`
+    verdict === "denied" ? DECLINED_BY_PERSON_NOTE
+    : verdict === "expired" ? `tool '${name}' blocked: approval timed out (10분 무응답)`
     : `tool '${name}' not approved`;
   audit(ctx, name, args, "deny", `approval ${verdict}`);
   return { allowed: false, approved: false, reason };

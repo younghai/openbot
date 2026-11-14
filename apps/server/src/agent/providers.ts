@@ -363,6 +363,11 @@ class MockProvider implements ModelProvider {
     if (/\bterminal\b|\brun\b|명령|커맨드|셸|shell/.test(text)) {
       push("terminal.exec", { command: "pwd && echo hello from mock bot && date" });
     }
+    if (/pycode/.test(text)) {
+      push("python.exec", { code: 'x = 21\nprint("hello", x * 2)' });
+    } else if (/pykeep/.test(text)) {
+      push("python.exec", { code: 'print("kept:", x * 2)' });
+    }
     if (/screenshot|스크린샷|화면 캡처/.test(text)) {
       push("desktop.screenshot", {});
     }

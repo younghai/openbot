@@ -47,7 +47,7 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 
 | 분야 | 도구 |
 |---|---|
-| 실행 | `terminal.exec`(가드+샌드박스) · `fs.read/write/list` · `task.update`(칸반 자기 보고) |
+| 실행 | `terminal.exec`(가드+샌드박스) · `python.exec`(상태 유지 인터프리터, 봇별 세션) · `fs.read/write/list` · `task.update`(칸반 자기 보고) |
 | 웹·조사 | `search.web`(DDG 키 없음) · `browser.fetch/open/click/type/snapshot`(Playwright) · `arxiv.search` · `pubmed.search` · `research.report` |
 | 지식 | `knowledge.index/search/list`(FTS5 RAG) · `memory.read/write/save` |
 | 커뮤니케이션 | `email.send` · `phone.sms/call` · `payment.send` |

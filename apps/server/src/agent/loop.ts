@@ -9,6 +9,7 @@ import "../tools/browser.js"; // registers interactive browser tools (optional p
 import "../tools/desktop-native.js"; // registers native desktop computer-use (optional agent-desktop)
 import "../tools/research.js"; // registers arxiv/pubmed search + research report
 import "../tools/genui.js"; // registers generative UI (OpenUI Lang)
+import "../tools/python.js"; // registers stateful python interpreter
 import { setDelegationRunner } from "../tools/core.js";
 import { listDynamicTools } from "../tools/dynamic.js";
 import { guardExternal } from "../injection.js";

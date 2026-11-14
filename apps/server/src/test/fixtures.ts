@@ -112,6 +112,20 @@ export function startFixtures(): Promise<{ server: http.Server; port: number; ca
             tool_calls: [{ id: id(), type: "function", function: { name: "browser.open", arguments: JSON.stringify({ url: "https://example.com" }) } }],
           });
         }
+        if (text.includes("pycode")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "python.exec", arguments: JSON.stringify({ code: 'x = 21\nprint("hello", x * 2)' }) } }],
+          });
+        }
+        if (text.includes("pykeep")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "python.exec", arguments: JSON.stringify({ code: 'print("kept:", x * 2)' }) } }],
+          });
+        }
         if (text.includes("summarize")) {
           return respond({ role: "assistant", content: "SUMMARY(fixture): 사용자가 커피를 좋아함" });
         }

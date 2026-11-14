@@ -39,7 +39,8 @@ const DENY_REGEX_SOURCES = DENY_PATH_PREFIXES.map((p) =>
 
 let profilePath: string | null = null;
 
-function ensureProfile(): string | null {
+/** sandbox-exec 프로파일 경로 (python REPL 등 장기 프로세스 재사용). 없으면 null = 비활성. */
+export function ensureProfile(): string | null {
   if (process.platform !== "darwin") return null;
   if (process.env.OPENBOT_DISABLE_SANDBOX === "1") return null;
   if (profilePath && fs.existsSync(profilePath) && fs.existsSync(path.join(RDATA, "terminal-sandbox.sb")) === false) profilePath = null;

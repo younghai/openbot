@@ -163,6 +163,21 @@ let alphaId = "", alphaConv = "";
   record("terminal tool loop", s.status === "done" && toolMsg && result?.exitCode === 0, `stdout="${result?.stdout?.trim().slice(0, 50)}" exit=${result?.exitCode}`);
 }
 
+// 3a-py. python interpreter: session state persists across messages (sandbox-exec confined)
+{
+  const r = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "PyBot", emoji: "🐍" }) });
+  const pyConv = r.body.conversationId as string;
+  const s1 = await send(pyConv, "pycode 로 실행해줘");
+  const m1 = (await messagesOf(pyConv)).find((m) => m.role === "tool" && m.tool_name === "python.exec");
+  const r1 = m1 ? JSON.parse(m1.tool_result) : null;
+  const s2 = await send(pyConv, "pykeep 이어서 실행");
+  const m2 = [...(await messagesOf(pyConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "python.exec");
+  const r2 = m2 ? JSON.parse(m2.tool_result) : null;
+  record("python interpreter: stateful session across messages",
+    s1.status === "done" && String(r1?.stdout ?? "").includes("hello 42") && s2.status === "done" && String(r2?.stdout ?? "").includes("kept: 42"),
+    `run1="${String(r1?.stdout ?? "").trim().slice(0, 40)}" run2="${String(r2?.stdout ?? "").trim().slice(0, 40)}"`);
+}
+
 // 3b/3c. approval queue: side-effect tools wait for a human decision before running
 {
   const r = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "Guard", emoji: "🛡" }) });

@@ -55,7 +55,7 @@ export const POLICY_PRESETS: PolicyPreset[] = [
     name: "기본 (안전)",
     description: "부작용 도구(터미널·파일 쓰기·브라우저 조작·화면 캡처)는 매번 승인. 읽기 전용은 자동 허용.",
     changes: {
-      "terminal.exec": "ask", "fs.write": "ask",
+      "terminal.exec": "ask", "fs.write": "ask", "python.exec": "ask",
       "browser.open": "ask", "browser.click": "ask", "browser.type": "ask",
       "desktop.screenshot": "allow", "desktop.list_apps": "allow", "desktop.snapshot": "allow", "desktop.act": "ask", "browser.fetch": "allow", "search.web": "allow",
       "arxiv.search": "allow", "pubmed.search": "allow", "research.report": "ask", "ui.render": "allow",
@@ -70,7 +70,7 @@ export const POLICY_PRESETS: PolicyPreset[] = [
     name: "로컬 작업장",
     description: "워크스페이스 안 터미널·파일 쓰기 자동 허용(일상 자동화용). 브라우저 조작·화면 캡처는 승인 유지.",
     changes: {
-      "terminal.exec": "allow", "fs.write": "allow",
+      "terminal.exec": "allow", "fs.write": "allow", "python.exec": "allow",
       "browser.open": "ask", "browser.click": "ask", "browser.type": "ask",
       "desktop.screenshot": "allow", "desktop.list_apps": "allow", "desktop.snapshot": "allow", "desktop.act": "ask", "browser.fetch": "allow", "search.web": "allow",
       "arxiv.search": "allow", "pubmed.search": "allow", "research.report": "ask", "ui.render": "allow",
@@ -85,7 +85,7 @@ export const POLICY_PRESETS: PolicyPreset[] = [
     name: "잠금 (최대 보수)",
     description: "웹 fetch·검색을 포함해 거의 모든 도구가 승인 필요. 외부 반출 우려가 있을 때.",
     changes: {
-      "terminal.exec": "ask", "fs.write": "ask",
+      "terminal.exec": "ask", "fs.write": "ask", "python.exec": "ask",
       "browser.open": "ask", "browser.click": "ask", "browser.type": "ask",
       "desktop.screenshot": "ask", "desktop.list_apps": "ask", "desktop.snapshot": "ask", "desktop.act": "ask", "browser.fetch": "ask", "search.web": "ask",
       "arxiv.search": "ask", "pubmed.search": "ask", "research.report": "ask", "ui.render": "allow",

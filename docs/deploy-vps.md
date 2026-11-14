@@ -2,6 +2,8 @@
 
 OpenBot은 로컬 퍼스트가 기본이지만, $5/월 VPS에 배포하면 노트북이 잠들어도 봇이 24/7 작동합니다. Telegram·Discord·Slack 채널로 원격 접속하세요.
 
+> ⚠️ **인증 없이 공개하지 마세요.** OpenBot은 터미널 실행·파일 쓰기·파이썬 실행 도구를 가진 봇 플릿입니다. 아래 2단계의 `OPENBOT_AUTH_TOKEN` 설정이 필수이며, 가능하면 HTTPS 리버스 프록시(Caddy·nginx)를 앞에 두세요.
+
 ## 1. VPS 준비 (Ubuntu 22.04+, 1GB RAM)
 
 ```bash
@@ -14,9 +16,15 @@ curl -fsSL https://get.docker.com | sh
 
 ```bash
 git clone <your-repo> openbot && cd openbot
+
+# 접근 토큰 생성 (필수 — 웹 UI·API·WS 전부 이 토큰으로 보호됩니다)
+echo "OPENBOT_AUTH_TOKEN=$(openssl rand -hex 24)" >> .env
+
 docker compose up -d
-# → http://your-vps:8940 접속 확인
+# → http://your-vps:8940 접속 → 로그인 화면에 토큰 붙여넣기
 ```
+
+토큰을 설정하면 모든 `/api` 요청과 WebSocket이 `Authorization: Bearer <토큰>`(WS는 `?token=`)을 요구합니다. 토큰이 없는 로컬 실행(`127.0.0.1` 바인딩)은 계속 열려 있습니다.
 
 데이터는 Docker 볼륨 `openbot-data`에 저장됩니다. 백업: `docker compose exec openbot curl -X POST http://localhost:8940/api/backup`.
 

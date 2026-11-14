@@ -8,7 +8,8 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function connect(): void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  socket = new WebSocket(`${proto}://${location.host}/ws`);
+  const token = localStorage.getItem("openbotToken");
+  socket = new WebSocket(`${proto}://${location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ""}`);
   socket.onmessage = (ev) => {
     try {
       const parsed = JSON.parse(ev.data) as ServerEvent;

@@ -3,9 +3,10 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
 import { addSender, removeSender } from "./events.js";
 import { enqueueFromHttp } from "./chat.js";
+import { wsTokenOk } from "./auth.js";
 
 export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
-  if (req.url !== "/ws") {
+  if (req.url === undefined || !req.url.startsWith("/ws") || !wsTokenOk(req.url)) {
     socket.destroy();
     return;
   }

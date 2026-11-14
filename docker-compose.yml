@@ -13,6 +13,8 @@ services:
       - OPENBOT_HOST=0.0.0.0
       - OPENBOT_PORT=8940
       - OPENBOT_DATA_DIR=/data
+      # Access token (REQUIRED for VPS exposure — protects /api and WS)
+      - OPENBOT_AUTH_TOKEN=${OPENBOT_AUTH_TOKEN:-}
       # Telegram: set to enable the remote channel
       # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       # - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}

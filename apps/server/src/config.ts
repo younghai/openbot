@@ -19,6 +19,12 @@ export const MEMORY_DIR = path.join(DATA_DIR, "memory");
 export const MEDIA_DIR = path.join(DATA_DIR, "media");
 export const SECRET_PATH = path.join(DATA_DIR, ".secret");
 
+/**
+ * 접근 토큰 (LAN/VPS 노출용). 설정하면 모든 /api와 WS가 Bearer 토큰을 요구한다.
+ * 미설정 = 로컬 개방 (기본 바인딩 127.0.0.1이 이미 보호).
+ */
+export const AUTH_TOKEN = process.env.OPENBOT_AUTH_TOKEN?.trim() || "";
+
 export function ensureDirs(): void {
   for (const dir of [DATA_DIR, COMPUTERS_DIR, SKILLS_DIR, MEDIA_DIR]) {
     fs.mkdirSync(dir, { recursive: true });

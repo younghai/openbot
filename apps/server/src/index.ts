@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { ensureDirs, PORT, SKILLS_DIR, VERSION } from "./config.js";
+import { requireAuth, wsTokenOk, AUTH_ENABLED } from "./auth.js";
 import { api } from "./routes.js";
 import { handleUpgrade } from "./ws.js";
 import { wireDelegation } from "./agent/loop.js";
@@ -41,6 +42,7 @@ function pruneState(): void {
 }
 
 const app = new Hono();
+app.use("/api/*", requireAuth);
 app.route("/api", api);
 app.onError((err, c) => {
   console.error(`[openbot] ${c.req.method} ${c.req.path} failed:`, err);
@@ -62,7 +64,7 @@ if (fs.existsSync(webDist)) {
 const server = serve(
   { fetch: app.fetch, port: PORT, hostname: process.env.OPENBOT_HOST ?? "127.0.0.1" },
   (info) => {
-  console.log(`[openbot] v${VERSION} listening on http://localhost:${info.port} (ws: /ws)`);
+    console.log(`[openbot] v${VERSION} listening on http://localhost:${info.port} (ws: /ws)${AUTH_ENABLED ? " [auth: token required]" : ""}`);
   if (!fs.existsSync(webDist)) {
     console.log(`[openbot] web client not built yet (${webDist}); run 'pnpm dev:web' for the dev server`);
   }

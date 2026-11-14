@@ -827,6 +827,45 @@ let fixProviderBotConv = "";
   record("bot lifecycle (rename + delete cascade)", patch.status === 200 && renamed?.name === "TempBot2" && del.status === 200 && !after, `renamed=${renamed?.name} deleted=${!after}`);
 }
 
+// 30. access token auth: second server with OPENBOT_AUTH_TOKEN — api 401/200, ws rejected, health open
+{
+  const port = PORT + 1; // 메인 매트릭스 서버와 포트 충돌 금지 (랜덤 범위가 같으면 엉뚱한 서버가 응답함)
+  const authData = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-auth-"));
+  const AUTH = "matrix-test-token-1234";
+  const authServer = spawn(path.resolve(here, "../../node_modules/.bin/tsx"), [path.join(here, "..", "index.ts")], {
+    cwd: here,
+    env: { ...process.env, OPENBOT_PORT: String(port), OPENBOT_HOST: "127.0.0.1", OPENBOT_DATA_DIR: authData, OPENBOT_AUTH_TOKEN: AUTH },
+    stdio: ["ignore", "ignore", "ignore"],
+    detached: true,
+  });
+  const base2 = `http://127.0.0.1:${port}`;
+  const up = await waitFor(async () => {
+    try { return (await fetch(`${base2}/api/health`)).ok; } catch { return false; }
+  }, 20_000, "auth server up");
+  const healthOpen = await (await fetch(`${base2}/api/health`)).json();
+  const noToken = await fetch(`${base2}/api/bootstrap`);
+  const badToken = await fetch(`${base2}/api/bootstrap`, { headers: { authorization: "Bearer wrong" } });
+  const goodToken = await fetch(`${base2}/api/bootstrap`, { headers: { authorization: `Bearer ${AUTH}` } });
+  const qToken = await fetch(`${base2}/api/bootstrap?token=${encodeURIComponent(AUTH)}`);
+  // WS without token must be rejected (socket destroyed → connection error)
+  let wsBlocked = false;
+  try {
+    const ws = new (await import("ws")).WebSocket(`ws://127.0.0.1:${port}/ws`);
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(() => { ws.terminate(); resolve(); }, 3000);
+      ws.on("open", () => { clearTimeout(t); ws.terminate(); resolve(); });
+      ws.on("error", () => { clearTimeout(t); reject(new Error("blocked")); });
+    });
+  } catch {
+    wsBlocked = true;
+  }
+  record("access token auth (OPENBOT_AUTH_TOKEN)",
+    up && healthOpen?.ok === true && noToken.status === 401 && badToken.status === 401 && goodToken.status === 200 && qToken.status === 200 && wsBlocked,
+    `health=${healthOpen?.ok} noToken=${noToken.status} bad=${badToken.status} good=${goodToken.status} query=${qToken.status} wsBlocked=${wsBlocked}`);
+  try { process.kill(-authServer.pid!, "SIGKILL"); } catch { /* already gone */ }
+  await fsp.rm(authData, { recursive: true, force: true }).catch(() => undefined);
+}
+
 // ---------------------------------------------------------------- teardown + report
 
 async function teardown(code: number): Promise<never> {

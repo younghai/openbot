@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { api } from "./api";
+import { api, UnauthorizedError } from "./api";
 import { subscribe } from "./ws";
 import type { Bootstrap, BotTemplate, NotificationRow } from "./types";
 import { ChatView } from "./components/ChatView";
@@ -46,8 +46,12 @@ export function App(): JSX.Element {
   useEffect(() => { setNavOpen(false); }, [page]);
   const unread = notifications.filter((n) => !n.read_at).length;
 
+  const [needToken, setNeedToken] = useState(false);
+
   const refresh = useCallback(() => {
-    api.bootstrap().then(setBoot).catch((e) => setError(String(e.message ?? e)));
+    api.bootstrap().then((b) => { setBoot(b); setError(""); setNeedToken(false); }).catch((e) => {
+      if (e instanceof UnauthorizedError) { setNeedToken(true); setError(""); } else setError(String(e.message ?? e));
+    });
     api.approvals("pending").then((r) => setPendingApprovals(r.length)).catch(() => undefined);
   }, []);
 
@@ -100,6 +104,25 @@ export function App(): JSX.Element {
   const visibleBots = new Set(boot?.bots.filter((b) => !b.hidden).map((b) => b.id) ?? []);
   const channelConversations = (boot?.conversations ?? []).filter((c) => c.kind === "channel");
 
+  if (needToken) {
+    return (
+      <div className="app error-screen">
+        <div className="card" style={{ maxWidth: 380, margin: "0 auto", padding: 24, textAlign: "center" }}>
+          <h2 style={{ margin: "0 0 6px" }}>🔐 OpenBot</h2>
+          <p className="muted small" style={{ margin: "0 0 14px" }}>이 서버는 접근 토큰으로 보호되어 있습니다</p>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const input = (e.currentTarget.elements.namedItem("token") as HTMLInputElement);
+            localStorage.setItem("openbotToken", input.value.trim());
+            location.reload();
+          }}>
+            <input name="token" type="password" placeholder="접근 토큰" autoFocus style={{ width: "100%", marginBottom: 10 }} />
+            <button className="btn primary" type="submit" style={{ width: "100%" }}>들어가기</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
   if (error) {
     return (
       <div className="app error-screen">

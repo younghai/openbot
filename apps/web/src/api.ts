@@ -1,10 +1,23 @@
 import type { Approval, AuditRow, Bootstrap, BotTemplate, CatalogEntry, Checkpoint, FileEntry, Job, Memory, Message, ModelPreset, NotificationRow, PolicyPreset, PresetModel, Prompt, SearchResults, Stats, Task, TtsProvider, UsageCap } from "./types";
 
+/** 저장된 접근 토큰 (서버 OPENBOT_AUTH_TOKEN 설정 시 필요) */
+export function authToken(): string {
+  return localStorage.getItem("openbotToken") ?? "";
+}
+
+function authHeaders(): Record<string, string> {
+  const t = authToken();
+  return t ? { authorization: `Bearer ${t}` } : {};
+}
+
+export class UnauthorizedError extends Error {}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "content-type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
   });
+  if (res.status === 401) throw new UnauthorizedError("접근 토큰이 필요합니다");
   if (!res.ok && !(res.status === 503 && path.includes("/test"))) {
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
@@ -33,7 +46,7 @@ export const api = {
   uploadAttachment: async (file: File): Promise<{ path: string; url: string; name: string; size: number; contentType: string }> => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/media/attachments", { method: "POST", body: form });
+    const res = await fetch("/api/media/attachments", { method: "POST", body: form, headers: authHeaders() });
     const body = (await res.json().catch(() => ({}))) as { path?: string; error?: string };
     if (!res.ok || !body.path) throw new Error(body.error ?? `HTTP ${res.status}`);
     return body as { path: string; url: string; name: string; size: number; contentType: string };
@@ -68,7 +81,7 @@ export const api = {
   createFromTemplate: (templateId: string, name?: string) =>
     req<{ id: string; conversationId: string; name: string; routines: number }>(`/bot-templates/${templateId}/create`, { method: "POST", body: JSON.stringify({ name }) }),
   exportTeam: async (): Promise<string> => {
-    const res = await fetch("/api/teams/export");
+    const res = await fetch("/api/teams/export", { headers: authHeaders() });
     return res.text();
   },
   importTeam: (markdown: string, dryRun = false) =>
@@ -83,7 +96,7 @@ export const api = {
   fileContent: (scope: "memory" | "workspace", path: string, computerId?: string, botId?: string) =>
     req<{ path: string; content: string }>(`/files/content?scope=${scope}&path=${encodeURIComponent(path)}${computerId ? `&computerId=${computerId}` : ""}${botId ? `&botId=${botId}` : ""}`),
   fileContentUrl: (scope: "memory" | "workspace", path: string, computerId?: string, botId?: string) =>
-    `/api/files/content?scope=${scope}&path=${encodeURIComponent(path)}${computerId ? `&computerId=${computerId}` : ""}${botId ? `&botId=${botId}` : ""}`,
+    `/api/files/content?scope=${scope}&path=${encodeURIComponent(path)}${computerId ? `&computerId=${computerId}` : ""}${botId ? `&botId=${botId}` : ""}${authToken() ? `&token=${encodeURIComponent(authToken())}` : ""}`,
   saveFile: (body: { scope: "memory" | "workspace"; path: string; content: string; computerId?: string; botId?: string }) =>
     req<{ ok: boolean }>("/files/content", { method: "PUT", body: JSON.stringify(body) }),
   checkpoints: () => req<Checkpoint[]>("/checkpoints"),
@@ -132,7 +145,7 @@ export const api = {
   tts: async (text: string, provider: TtsProvider): Promise<{ audio?: Blob; fallbackBrowser: boolean; error?: string }> => {
     const res = await fetch("/api/voice/tts", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ text, provider }),
     });
     if (res.ok) return { audio: await res.blob(), fallbackBrowser: false };
@@ -142,5 +155,8 @@ export const api = {
 };
 
 export function mediaUrl(path: string): string {
-  return `/api/media/${path.replace(/^\/?api\/media\/?/, "")}`;
+  const clean = `/api/media/${path.replace(/^\/?api\/media\/?/, "")}`;
+  // <img src>는 헤더를 못 실으므로 쿼리 파라미터 폴백 사용 (서버도 ?token= 허용)
+  const t = authToken();
+  return t ? `${clean}?token=${encodeURIComponent(t)}` : clean;
 }

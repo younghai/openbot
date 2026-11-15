@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenBot(younghai) vs CopilotKit/OpenBot — 심층 비교 분석</title>
+<style>
+  :root { --bg:#0a0a0f; --panel:#12121c; --panel2:#1a1a28; --border:#2a2a3c; --text:#e8e8f2; --muted:#9a9ab0;
+    --accent:#7c3aed; --cyan:#06b6d4; --good:#34d399; --warn:#fbbf24; --bad:#f87171; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; line-height:1.65; }
+  .wrap { max-width:1080px; margin:0 auto; padding:40px 24px 80px; }
+  h1 { font-size:30px; margin:0 0 6px; background:linear-gradient(90deg,#a78bfa,#67e8f9); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:34px; }
+  h2 { font-size:22px; margin:48px 0 14px; border-left:4px solid var(--accent); padding-left:12px; }
+  h3 { font-size:16px; margin:26px 0 10px; color:#c4b5fd; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin:14px 0; }
+  .muted { color:var(--muted); font-size:13px; }
+  small { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0; }
+  th,td { border-bottom:1px solid var(--border); padding:9px 10px; text-align:left; vertical-align:top; }
+  th { color:#a5b4fc; font-weight:600; background:var(--panel2); }
+  tr:hover td { background:rgba(124,58,237,.05); }
+  .score { font-weight:700; font-size:15px; }
+  .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; margin:0 4px 4px 0; }
+  .pill.win { background:rgba(52,211,153,.14); color:var(--good); }
+  .pill.lose { background:rgba(248,113,113,.14); color:var(--bad); }
+  .pill.tie { background:rgba(251,191,36,.14); color:var(--warn); }
+  .bar { height:10px; border-radius:6px; background:var(--panel2); overflow:hidden; margin-top:6px; }
+  .bar > i { display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,var(--accent),var(--cyan)); }
+  .verdict { background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08)); border:1px solid #3b2a6b; border-radius:14px; padding:20px 24px; margin:20px 0; }
+  .big { font-size:38px; font-weight:800; }
+  code { background:var(--panel2); padding:1px 6px; border-radius:5px; font-size:12.5px; font-family:ui-monospace,monospace; }
+  ul { margin:8px 0; padding-left:22px; }
+  li { margin:4px 0; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:800px){ .two{grid-template-columns:1fr;} }
+  .kicker { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#8b8ba7; margin-bottom:4px; }
+  .flow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:13px; margin:10px 0; }
+  .flow .step { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+  .flow .arrow { color:var(--accent); font-weight:700; }
+  .measured { border-left:3px solid var(--cyan); padding-left:12px; margin:10px 0; color:#a5f3fc; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>OpenBot(younghai) vs CopilotKit/OpenBot</h1>
+<div class="sub">분석일 2026-11-15 · 대상 커밋 93e1d5d (#1678) · 방법: 소스·문서 심층 독해 + 우리 서비스 실측(Playwright, agent-desktop, 실모델 E2E)</div>
+
+<!-- ================= 총평 ================= -->
+<h2>1. 총평 — 점수표</h2>
+<div class="verdict">
+  <div class="kicker">종합</div>
+  <div class="big"><span class="good">우리 82</span> <span class="muted">vs</span> <span class="warn">CopilotKit 93</span> <small style="font-size:14px">(100점 만점, 항목 가중 평균)</small></div>
+  <p class="muted" style="margin:10px 0 0">
+    한 문장 요약: <b>우리는 "1인용 완성도"에서 근접</b>(승인·감사·보안·도구 폭은 동급 또는 우세)하고,
+    CopilotKit은 <b>"조직 제품 완성도"에서 압승</b>(다중 사용자·AG-UI 버스·배포 인프라). 품질 축(테스트·문서)은 이들이 앞서고,
+    아키텍처 축(경량성·무키)은 우리가 앞선다.
+  </p>
+</div>
+
+<table>
+  <thead><tr><th>평가 축</th><th>가중치</th><th>우리</th><th>CK</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td><b>핵심 기능 커버</b> (봇·도구·채널·루틴·메모리)</td><td>25%</td><td class="score good">86</td><td class="score warn">95</td><td>도구 39종+파이썬 인터프리터 vs 앱 커넥터·이벤트 트리거·컴포넌트 갤러리</td></tr>
+    <tr><td><b>보안·거버넌스</b> (승인·감사·샌드박스)</td><td>20%</td><td class="score good">84</td><td class="score warn">96</td><td>우리: 가드 5겹+스코프 승인. CK: CEL 정책엔진+initiator 추적+네트워크 프록시</td></tr>
+    <tr><td><b>품질 증명</b> (테스트·문서·정적분석)</td><td>15%</td><td class="score warn">72</td><td class="score good">97</td><td>우리: 매트릭스60+유닛24. CK: 유닛/통합 전 영역+biome+OpenAPI 스펙테스트</td></tr>
+    <tr><td><b>아키텍처</b> (경량·무키·이식성)</td><td>15%</td><td class="score good">92</td><td class="score bad">74</td><td>우리: node:sqlite 6의존 단일프로세스. CK: Postgres+Intelligence+7서비스</td></tr>
+    <tr><td><b>서비스 흐름·UX</b> (온보딩→운영)</td><td>15%</td><td class="score warn">80</td><td class="score good">95</td><td>우리: 마법사+템플릿+GenUI. CK: 라이브 화면·제어권 이관·Recorder·데스크톱 설치</td></tr>
+    <tr><td><b>확장 생태</b> (에이전트 버스·커뮤니티)</td><td>10%</td><td class="score bad">55</td><td class="score good">98</td><td>CK: AG-UI 14프레임워크+MCP카탈로그+기여자 생태. 우리: 로컬 스킬/팀 마크다운만</td></tr>
+  </tbody>
+</table>
+
+<!-- ================= 컴퓨터유즈 실측 ================= -->
+<h2>2. Computer Use 실측 비교 <small style="font-weight:400">— 오늘 우리 머신에서 직접 돌려본 결과</small></h2>
+
+<div class="measured">
+  실측 1: 채팅에서 "example.com 읽어와서 제목 알려줘" → <b>browser.fetch 18초에 성공</b>, 봇이 "제목은 Example Domain입니다" 정답. 승인 0회(allow 정책).<br>
+  실측 2: "openpage — 브라우저로 열어줘" → <b>browser.open이 실제 Chromium 기동</b>, 승인 큐 거친 뒤 <b>스크린샷이 채팅에 인라인</b> 렌더.<br>
+  실측 3: <code>agent-desktop 1.1.0</code> 설치 확인, macOS <b>accessibility granted</b> — 네이티브 데스크톱 스냅샷/act 경로 유효.<br>
+  실측 4(부재 확인): <b>라이브 화면 스트리밍 패널 없음</b>(스크린샷 스냅샷만), <b>WS screen/terminal 프록시 채널 없음</b>, <b>사람 제어권 이관(human takeover) 없음</b>.
+</div>
+
+<table>
+  <thead><tr><th>컴퓨터유즈 능력</th><th>우리</th><th>CopilotKit</th><th>차등</th></tr></thead>
+  <tbody>
+    <tr><td>헤드리스 웹 읽기(fetch)</td><td>✅ SSRF가드+curl 폴백</td><td>✅ 3개 상용 프로바이더(Parallel/Exa/Firecrawl)</td><td><span class="pill tie">대등</span> 그들은 키로 한계 완화, 우리는 키 없이</td></tr>
+    <tr><td>대화형 브라우저(클릭·입력)</td><td>✅ Playwright + 스냅샷</td><td>✅ 봇별 격리 컨테이너 Chromium(프로필·로그인 영속)</td><td><span class="pill lose">열세</span> 우리는 컨테이너 격리·세션 영속 없음(로컬 워크스페이스만)</td></tr>
+    <tr><td>라이브 화면 보기</td><td>❌ 스크린샷만</td><td>✅ WS 프록시 라이브 스트리밍(`/computers/:bot/screen`)</td><td><span class="pill lose">열세</span> "봇이 일하는 걸 지켜보는" 신뢰 경험 부재</td></tr>
+    <tr><td>라이브 터미널 보기</td><td>❌ 결과만</td><td>✅ 한 개 영속 셸 스트리밍(cd·env 유지)</td><td><span class="pill lose">열세</span> 같은 격차</td></tr>
+    <tr><td>사람 제어권 이관(takeover)</td><td>❌ 없음 — CAPTCHA·로그인에서 봇이 막힘</td><td>✅ computer_request_help → 사람이 그 부분만 수행 → 반환, 세션 유지. 시크릿은 마스크 박스로 직주입(봇이 못 봄)</td><td><span class="pill lose">최대 격차</span> 자동화 실패 시 유일한 탈출로</td></tr>
+    <tr><td>네이티브 데스크톱 조작</td><td>✅ agent-desktop 접근성 트리(ref 기반, 권한 granted 실측)</td><td>❌ 브라우저·셸 중심(네이티브 앱 조작 도구 없음)</td><td><span class="pill win">우세</span> 우리만 있는 능력</td></tr>
+    <tr><td>컴퓨터 격리 모델</td><td>△ sandbox-exec 읽기차단(단일 머신)</td><td>✅ 봇별 컨테이너+파생토큰(HMAC)+이그레스 프록시 4모드</td><td><span class="pill lose">열세</span> 다봇 동시 사용·네트워크 정책</td></tr>
+    <tr><td>컴퓨터 상태 영속</td><td>△ 워크스페이스 파일만</td><td>✅ 브라우저 프로필·로그인·파일 전부 컨테이너에 영속</td><td><span class="pill lose">열세</span> 로그인 세션 재사용 불가 → 매번 물음</td></tr>
+  </tbody>
+</table>
+<p class="muted">결론: <b>도구 "실행 능력"은 대등하나, "보면서 신뢰"와 "막힌 곳 사람에게 넘기기"가 빠져 있다.</b> 이 둘이 CopilotKit 컴퓨터유즈 체험의 핵심이다.</p>
+
+<!-- ================= 기능 비교 ================= -->
+<h2>3. 기능 매트릭스 — 전 영역</h2>
+
+<h3>3.1 에이전트 코어</h3>
+<table>
+  <thead><tr><th>기능</th><th>우리</th><th>CK</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>영속 봇(페르소나·메모리·대화)</td><td>✅</td><td>✅ coworker 프로필 3테이블 분리</td><td><span class="pill tie">대등</span></td></tr>
+    <tr><td>멀티 봇 그룹 대화</td><td>✅ 채널+리스폰더 모드(all/lead/auto)</td><td>✅ 봇별 스레드+공유 트랜스크립트</td><td><span class="pill tie">대등</span></td></tr>
+    <tr><td>봇→봇 위임</td><td>✅ bot.delegate(순환·깊이 3)</td><td>✅ message_bot — 타이핑된 입력(작업·제약·좋은 답의 조건)+실패시 봇이 대화에 실패 보고</td><td><span class="pill lose">소폭 열세</span> 위임 계약 타입·실패 가시성</td></tr>
+    <tr><td>사람에게 질문(ask_person)</td><td>△ 승인 카드로만(도구 승인 시점)</td><td>✅ ask_person 도구 — 판단 필요시 언제든 능동 질문+에스컬레이션 감사</td><td><span class="pill lose">열세</span></td></tr>
+    <tr><td>루틴</td><td>✅ cron+act/report+goal(GOAL_REACHED)</td><td>✅ 4부 구조+이벤트 트리거("PR 열릴 때")+봇이 도구로 루틴 생성</td><td><span class="pill lose">소폭 열세</span> 이벤트 트리거·봇 자기관리 도구</td></tr>
+    <tr><td>스킬</td><td>✅ SKILL.md+자동 학습(14b 증류→검토→반영)</td><td>✅ 3경로(작성/시연 녹화/대화 학습)+역할 선언(@research/search)</td><td><span class="pill tie">대등</span> 녹화(시연) 경로만 미보유</td></tr>
+    <tr><td>프롬프트 인젝션 방어</td><td>✅ 경계표시+11패턴</td><td>✅ user-content.ts 하드닝(+테스트)</td><td><span class="pill tie">대등</span></td></tr>
+    <tr><td>모델 선택</td><td>✅ OpenAI호환+Anthropic+Ollama 무키</td><td>△ OpenAI호환 위주(Intelligence가 모델 게이트)</td><td><span class="pill win">우세</span> 완전 로컬 경로</td></tr>
+    <tr><td>제너러티브 UI</td><td>✅ OpenUI Lang(차트·표·카드+버튼 액션 대화 복귀)</td><td>✅ Components(React 갤러리+샌드박스 플레이그라운드+퍼블리시 게이트)</td><td><span class="pill tie">대등</span> 그들은 "컴포넌트 승인·데이터함수 권한"까지 거버넌스</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 거버넌스·보안</h3>
+<table>
+  <thead><tr><th>기능</th><th>우리</th><th>CK</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>승인 큐</td><td>✅ 스코프 3종+만료+프리셋</td><td>✅ 4응답+종류별(admin이 폐쇄 가능)+시크릿 직접입력 위임</td><td><span class="pill tie">대등</span></td></tr>
+    <tr><td>감사 로그</td><td>✅ 전 도구+승인행+거절행</td><td>✅ +<b>initiator_kind</b>(person/routine/handoff…) "아무도 안 볼 때 한 일" 필터+CSV 내보내기(수식 인젝션 방어)</td><td><span class="pill lose">열세</span> 무인 실행 추적·내보내기</td></tr>
+    <tr><td>정책 엔진</td><td>△ 도구별 allow/ask(프리셋)</td><td>✅ CEL 표현식 규칙(page.url, command, file.path…)+deny 우선+fail-closed+dry-run</td><td><span class="pill lose">열세</span> 조건부 정책 표현력</td></tr>
+    <tr><td>명령 차단</td><td>✅ 10패턴 정적 가드</td><td>△ 정책 위임(기본 allow all)</td><td><span class="pill win">우세</span> 안전 하한선 내장</td></tr>
+    <tr><td>샌드박스</td><td>✅ macOS Seatbelt(실측된 한계 문서화)</td><td>✅ 컨테이너+gVisor(runsc 옵션)+네트워크 이그레스 필터</td><td><span class="pill lose">열세</span> OS 수준 격리 강도</td></tr>
+    <tr><td>자격증명</td><td>✅ AES-256-GCM 볼트</td><td>✅ 볼트+시크릿 직주입(봇이 값 못 봄)+감사는 글자수만</td><td><span class="pill lose">소폭 열세</span> 직주입 경로</td></tr>
+    <tr><td>지출 상한</td><td>✅ 봇별 일/월 토큰</td><td>✅ (기업 컨트롤 내)</td><td><span class="pill tie">대등</span></td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 채널·접점</h3>
+<table>
+  <thead><tr><th>기능</th><th>우리</th><th>CK</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>채널 수</td><td>✅ Telegram·Discord·Slack·Email·전화·결제(6)</td><td>△ Slack·Teams(문서 기준 2)</td><td><span class="pill win">우세</span></td></tr>
+    <tr><td>원격 승인</td><td>✅ 텔레그램 인라인 4버튼·디스코드·슬랙</td><td>△ 앱 중심(채널 원격승인 문서 없음)</td><td><span class="pill win">우세</span></td></tr>
+    <tr><td>웹·모바일</td><td>△ 웹(PWA 설치 가능)</td><td>✅ 웹+iOS+Android 앱</td><td><span class="pill lose">열세</span></td></tr>
+    <tr><td>데스크톱</td><td>△ Tauri 셸(스캐폴드, 서버 자식기동+트레이)</td><td>✅ 서명·노터라이즈 dmg/exe+자동업데이트+마이크 권한 문서</td><td><span class="pill lose">열세</span></td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 학습·지식</h3>
+<table>
+  <thead><tr><th>기능</th><th>우리</th><th>CK</th><th>판정</th></tr></thead>
+  <tbody>
+    <tr><td>문서 RAG</td><td>✅ FTS5+bge-m3 하이브리드(RRF) — 한국어 유의어 실측 해결</td><td>△ Intelligence 위임(자체 구현 없음)</td><td><span class="pill win">우세</span></td></tr>
+    <tr><td>메모리</td><td>✅ 스코프(DM/채널)+관련도 점수+Markdown 계층</td><td>✅ Intelligence 영속+연결 앱 수집(memory initiator 감사)</td><td><span class="pill tie">대등</span></td></tr>
+    <tr><td>대화→스킬</td><td>✅ 로컬모델 증류→검토→반영</td><td>✅ Intelligence 분석+제안+녹화(시연)+공유 요청 흐름</td><td><span class="pill tie">대등</span> 무키 대비 자동 스케줄 분석만 차이</td></tr>
+    <tr><td>학술 리서치</td><td>✅ arXiv·PubMed+7섹션 보고서(키 없음)</td><td>❌ (일반 웹검색만)</td><td><span class="pill win">우세</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ================= 아키텍처 ================= -->
+<h2>4. 아키텍처 비교</h2>
+<div class="two">
+  <div class="card">
+    <h3 style="margin-top:0">우리 — 단일 프로세스 무키</h3>
+    <div class="flow">
+      <span class="step">React 18 (Vite, PWA)</span><span class="arrow">→</span>
+      <span class="step">Hono :8940 (6 deps)</span><span class="arrow">→</span>
+      <span class="step">node:sqlite WAL</span>
+    </div>
+    <ul>
+      <li>에이전트 루프·게이트웨이·큐·루틴·채널 <b>전부 한 프로세스</b></li>
+      <li>도구 39종이 같은 <code>executeTool</code> 단일 관문(승인→체크포인트→감사)</li>
+      <li>컴퓨터 = 로컬 워크스페이스+Seatbelt / agent-desktop</li>
+      <li>백업 = 파일 복사 한 장. 복구 5초</li>
+      <li>약점: 확장은 "더 큰 머신"뿐 — 레플리카·분산 개념 없음</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">CopilotKit — 서비스 분해 조직용</h3>
+    <div class="flow">
+      <span class="step">app :3010</span><span class="arrow">→</span>
+      <span class="step">server :3001</span><span class="arrow">→</span>
+      <span class="step">AG-UI 런타임</span><span class="arrow">→</span>
+      <span class="step">agent-* 420x</span>
+    </div>
+    <ul>
+      <li>Postgres(감사·정책·큐) + Intelligence(스레드·메모리·학습) 외부</li>
+      <li><b>컴퓨터=독립 컨테이너</b>(supervisor :4500가 생성, 서버 토큰 안 줌, 이그레스 프록시)</li>
+      <li>OpenAPI 3.1 스펙→클라이언트 자동생성, Idempotency-Key, problem+json</li>
+      <li>LISTEN/NOTIFY로 레플리카 동기, work_items skip-locked 큐</li>
+      <li>약점: 설치 무게(7서비스+Intelligence), 클라우드 의존 구간</li>
+    </ul>
+  </div>
+</div>
+<div class="card">
+  <b>게이트웨이 철학은 같다</b> — "컴퓨터는 정책을 판단하지 않는다, 서버 관문이 판단한다". 우리도 CK도 승인→감사→실행 3단. 차이는 표현력: CK는 CEL 규칙+initiator 서명 어서션까지, 우리는 도구×정책+스코프 허용까지.
+</div>
+
+<!-- ================= 서비스 흐름 ================= -->
+<h2>5. 서비스 흐름 비교 — "사람이 겪는 순서"</h2>
+<table>
+  <thead><tr><th>여정</th><th>우리</th><th>CopilotKit</th><th>격차 원인</th></tr></thead>
+  <tbody>
+    <tr><td>① 설치</td><td>pnpm install → dev, 또는 docker compose. 키 0개</td><td>dmg/exe 내려받아 클릭(개발자 도구 불필요)</td><td>배포 패키징(서명·업데이터)</td></tr>
+    <tr><td>② 첫 봇</td><td>마법사 3단(이름→Ollama 감지→첫 질문)+템플릿 5종</td><td>Personal Assistant 자동 생성+하네스 선택(14프레임워크)</td><td>BYO 에이전트 버스</td></tr>
+    <tr><td>③ 일 시키기</td><td>채팅+도구 카드+GenUI 결과+👍/👎</td><td>채팅+<b>라이브 화면 옆 패널</b>+컴포넌트+필요시 사람 개입</td><td>라이브 스트리밍·제어권</td></tr>
+    <tr><td>④ 막혔을 때</td><td>승인 카드로 답(스코프 선택 가능) — 그 외엔 봇이 포기하거나 우회 시도</td><td>request_help로 그 한 걸음만 사람이 수행→반환, 시크릿은 마스크 박스</td><td>제어권 이관 도구+프롬프트 유도</td></tr>
+    <tr><td>⑤ 반복 시키기</td><td>루틴 폼(cron+mode+goal)·채널 승인</td><td>루틴 폼+대화에서 "매주 월요일에…"→봇이 루틴 도구로 스스로 생성</td><td>루틴 쓰기 도구</td></tr>
+    <tr><td>⑥ 가르치기</td><td>🎓 버튼→증류→설정 검토</td><td>Recorder로 <b>시연 녹화</b>→제안→승인→공유 요청</td><td>브라우저 녹화 파이프라인</td></tr>
+    <tr><td>⑦ 감시·감사</td><td>대시보드+감사 페이지+알림</td><td>Activity(도구결과 그대로)+Audit(initiator 필터)+CSV 내보내기</td><td>감사 UX 깊이</td></tr>
+  </tbody>
+</table>
+
+<!-- ================= 격차 제안 ================= -->
+<h2>6. 우리가 부족한 것 — 추가 제안 (우선순위)</h2>
+
+<h3>P0 — 컴퓨터유즈 격차 해소 (체험 품질 최대 격차)</h3>
+<div class="card">
+  <ul>
+    <li><b>🅐 라이브 브라우저 패널</b> — Playwright 페이지를 WS로 프레임 캡처(jpeg 2-4fps)해 채팅 옆에 스트리밍. 승인 대기 중에도 화면이 보이면 신뢰가 생긴다. <span class="muted">기반: 이미 있는 ws.ts + browser.open 세션. 공수 1-2일</span></li>
+    <li><b>🅑 제어권 이관 (takeover)</b> — <code>computer.request_help</code> 도구: 봇이 호출하면 승인 카드가 "사람이 직접" 모드로 전환 → 라이브 패널에서 키보드·마우스 CDP 바인딩 → 완료 버튼 → 봇 재개. CAPTCHA·로그인의 유일한 정상 탈출로. <span class="muted">공수 2-3일. CK의 computer_request_help + 시크릿 마스크 박스(computer_request_secret)까지 벤치마크</span></li>
+    <li><b>🅒 브라우저 세션 영속</b> — userDataDir을 워크스페이스 아래 고정해 로그인·쿠키가 봇별로 남게. "매번 다시 로그인" 제거. <span class="muted">공수 반나절</span></li>
+  </ul>
+</div>
+
+<h3>P1 — 감사·위임 표현력</h3>
+<div class="card">
+  <ul>
+    <li><b>🅓 initiator_kind 감사 열</b> — person/routine/handoff 구분 기록 + "아무도 안 볼 때" 필터. 무인 실행 신뢰의 핵심. <span class="muted">audit_log 컬럼 추가(애드온)+queue 소스 전달. 공수 1일</span></li>
+    <li><b>🅔 ask_person 도구</b> — 봇이 언제든 능동적으로 질문(도구 승인과 별개). 승인 카드는 "도구 허가"만 커버, "판단 질문"은 미커버. <span class="muted">공수 반나절</span></li>
+    <li><b>🅕 위임 계약 타입화</b> — bot.delegate 인자에 task/bounds/definition_of_done 분리 + 실패 시 대화에 명시 보고. <span class="muted">공수 반나절</span></li>
+    <li><b>🅗 루틴 쓰기 도구</b> — 봇이 "매주 월요일에…" 대화에서 스스로 create_routine. <span class="muted">공수 반나절</span></li>
+  </ul>
+</div>
+
+<h3>P2 — 배포·생태 (전략 선택)</h3>
+<div class="card">
+  <ul>
+    <li><b>🅘 Tauri 완성</b> — 현재 스캐폴드. 빌드 실측+아이콘+자동업데이트까지 가면 "dmg 받아서 클릭" 계층 확보</li>
+    <li><b>🅚 이벤트 트리거 루틴</b> — "PR 열릴 때/이메일 오면" (cron 외 발화원). email·webhook 수신을 트리거로</li>
+    <li><b>🅜 OpenAPI 스펙화</b> — api/openapi.yaml(우리 계약 문서화)+스펙 테스트. 외부 클라이언트 생태의 씨앗</li>
+    <li><b>🅝 녹화(시연) 학습 경로</b> — 사람이 브라우저에서 하면 녹화→단계→스킬 제안(Recorder의 무키 버전)</li>
+  </ul>
+</div>
+
+<h3>지금 만들지 말 것 (의도적 비대칭)</h3>
+<div class="card muted">
+  <ul>
+    <li><b>다중 사용자·조직</b>(people/roles/SCIM) — 단일 사용자 무키 철학과 충돌. 우리의 정체성은 "1인 AI 팀원 플랫폼"</li>
+    <li><b>Postgres 전환</b> — node:sqlite는 우리 규모에 정답. LISTEN/NOTIFY·skip-locked 큐는 레플리카가 필요해질 때의 문제</li>
+    <li><b>AG-UI 버스</b> — 14프레임워크 통합은 유지비 폭탄. 대신 "OpenAI호환 엔드포인트면 무엇이든"이라는 우리 방식이 이미 BYO를 커버</li>
+    <li><b>상용 검색 프로바이더</b> — 키 요구. DDG+curl 폴백과 학술 API가 무키 정체성 유지</li>
+  </ul>
+</div>
+
+<!-- ================= 우위 요약 ================= -->
+<h2>7. 우리가 앞서는 것 (지킬 것)</h2>
+<ul>
+  <li><b>완전 무키 동작</b> — 설치→첫 대화까지 키 0개(Ollama+DDG+arXiv/PubMed+bge-m3+mock). CK는 최소 한 개 클라우드 의존</li>
+  <li><b>네이티브 데스크톱 컴퓨터유즈</b> — 접근성 트리 ref 기반(오늘 실측: 권한 granted). CK에 없는 고유 능력</li>
+  <li><b>6개 채널+원격 승인 버튼</b> — 텔레그램 4버튼 스코프 승인은 CK에도 없는 UX</li>
+  <li><b>경량 단일 배포</b> — 6의존 서버, 파일복사 백업, $5 VPS 가이드</li>
+  <li><b>한국어 특화 RAG</b> — 하이브리드 검색이 유의어 격차를 실측으로 해결</li>
+  <li><b>승인 대기 중에도 즉답하는 안전 설계</b> — 10분 무응답 자동거부·서버재시작 만료·가드 하한선</li>
+</ul>
+
+<p class="muted" style="margin-top:36px">검증 근거: 우리 실측(2026-11-15, Playwright+agent-desktop+14b E2E) · CK 문서 5,572줄 독해(architecture/approvals/routines/automatic-learning/web-research/personal-edition/configuration) · 소스 유닛테스트 구조 확인. 점수는 가중 기준에 따른 정성·정량 혼합 판정이다.</p>
+
+</div>
+</body>
+</html>

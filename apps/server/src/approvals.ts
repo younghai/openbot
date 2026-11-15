@@ -33,15 +33,23 @@ const waiters = new Map<string, Waiter>();
 
 // 시크릿 직주입 페이로드 (CK computer_request_secret 패턴): 승인 카드에 입력된 값은
 // 메모리에서만 살아있고 도구가 소진하면 지운다. 감사 로그에는 글자수만 남는다.
-const secretPayloads = new Map<string, string>();
+const secretPayloads = new Map<string, { value: string; at: number }>();
+const SECRET_TTL_MS = 5 * 60_000;
 export function setApprovalSecret(id: string, value: string): void {
-  secretPayloads.set(id, value);
+  secretPayloads.set(id, { value, at: Date.now() });
 }
 export function takeApprovalSecret(id: string): string | undefined {
   const v = secretPayloads.get(id);
   secretPayloads.delete(id);
-  return v;
+  return v?.value;
 }
+// 미소신 시크릿은 5분 후 파기 (승인 만료·거부 경로에서 도구가 소진하지 못한 값)
+setInterval(() => {
+  const cutoff = Date.now() - SECRET_TTL_MS;
+  for (const [id, v] of secretPayloads) {
+    if (v.at < cutoff) secretPayloads.delete(id);
+  }
+}, 60_000).unref?.();
 
 export function policyFor(tool: string): "allow" | "ask" {
   const row = db.prepare("SELECT mode FROM tool_policies WHERE tool=?").get(tool) as { mode: string } | undefined;

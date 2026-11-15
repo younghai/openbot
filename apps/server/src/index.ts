@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { ensureDirs, PORT, SKILLS_DIR, VERSION } from "./config.js";
+import { ensureDirs, PORT, SKILLS_DIR, VERSION, MEDIA_DIR } from "./config.js";
 import { requireAuth, wsTokenOk, AUTH_ENABLED } from "./auth.js";
 import { api } from "./routes.js";
 import { handleUpgrade } from "./ws.js";
@@ -39,6 +39,15 @@ function pruneState(): void {
   db.prepare("DELETE FROM queue_jobs WHERE finished_at IS NOT NULL AND finished_at < ?").run(cutoff);
   db.prepare("DELETE FROM audit_log WHERE created_at < ?").run(Date.now() - Math.max(days, 90) * 86_400_000);
   db.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < ?").run(cutoff);
+  // 미디어 프루닝 — 기존: browser 스크린샷·채팅 첨부가 영구 누적(디스크 고갈)
+  try {
+    for (const f of fs.readdirSync(MEDIA_DIR)) {
+      const full = path.join(MEDIA_DIR, f);
+      try {
+        if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
+      } catch { /* 개별 파일 실패는 무시 */ }
+    }
+  } catch { /* media dir 없음 */ }
 }
 
 const app = new Hono();

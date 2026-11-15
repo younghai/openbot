@@ -39,7 +39,7 @@ export function startRoutineScheduler(): void {
             insertMessage(conv.id, routine.bot_id, "user", `[routine: ${routine.name}] ${routine.prompt}`, {
               meta: { source: "routine", routineId: routine.id },
             });
-            enqueueJob(routine.bot_id, conv.id, fullPrompt, "routine");
+            enqueueJob(routine.bot_id, conv.id, fullPrompt, "routine", routine.id);
             if (goal) {
               // 목표 달성 감시: 잡 완료 후 어시스턴트 마지막 답변에서 GOAL_REACHED: yes 찾기 (지연 폴링)
               const checkGoal = async (tries: number): Promise<void> => {

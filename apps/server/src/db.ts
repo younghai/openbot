@@ -247,6 +247,7 @@ try { db.exec("ALTER TABLE routines ADD COLUMN mode TEXT NOT NULL DEFAULT 'act'"
 try { db.exec("ALTER TABLE routines ADD COLUMN goal TEXT"); } catch { }
 try { db.exec("ALTER TABLE routines ADD COLUMN trigger_key TEXT"); } catch { }
 try { db.exec("ALTER TABLE audit_log ADD COLUMN initiator TEXT NOT NULL DEFAULT 'person'"); } catch { }
+try { db.exec("ALTER TABLE queue_jobs ADD COLUMN routine_id TEXT"); } catch { }
 try { db.exec("ALTER TABLE routines ADD COLUMN enabled2 INTEGER"); } catch { }
 CREATE_TABLE_IF_NOT_EXISTS_usage_caps: {
   db.exec(`CREATE TABLE IF NOT EXISTS usage_caps (
@@ -292,4 +293,5 @@ export interface RoutineRow {
 export interface JobRow {
   id: string; bot_id: string; conversation_id: string; prompt: string; source: string;
   status: string; result: string | null; created_at: number; finished_at: number | null;
+  routine_id: string | null;
 }

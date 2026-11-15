@@ -8,10 +8,10 @@ import { runAgent, historyForProvider, getBot } from "./agent/loop.js";
  * hold their jobs. Jobs are crash-safe rows in SQLite.
  */
 
-export function enqueueJob(botId: string, conversationId: string, prompt: string, source: string): JobRow {
+export function enqueueJob(botId: string, conversationId: string, prompt: string, source: string, routineId?: string): JobRow {
   const id = uid();
-  db.prepare("INSERT INTO queue_jobs (id, bot_id, conversation_id, prompt, source, status, created_at) VALUES (?,?,?,?,?,?,?)").run(
-    id, botId, conversationId, prompt.slice(0, 8000), source, "pending", now()
+  db.prepare("INSERT INTO queue_jobs (id, bot_id, conversation_id, prompt, source, status, created_at, routine_id) VALUES (?,?,?,?,?,?,?,?)").run(
+    id, botId, conversationId, prompt.slice(0, 8000), source, "pending", now(), routineId ?? null
   );
   broadcast({ type: "queue.update", job: jobById(id) });
   void kickQueue();
@@ -23,6 +23,13 @@ function jobById(id: string): JobRow | undefined {
 }
 
 const inFlight = new Set<string>(); // bot ids currently running
+/** 취소·와치독 신호를 실행 중 에이전트에 전달 (cooperative cancel): 루프 반복마다 검사 */
+const stopSignals = new Set<string>();
+
+/** 실행 중(포함 대기) 잡 취소 — 러닝 잡도 다음 루프 반복에서 즉시 중단된다 (기존: pending만 취소 → 토큰 낭비) */
+export function requestStop(jobId: string): void {
+  stopSignals.add(jobId);
+}
 
 export async function kickQueue(): Promise<void> {
   const pending = db.prepare("SELECT * FROM queue_jobs WHERE status='pending' ORDER BY created_at").all() as unknown as JobRow[];
@@ -44,6 +51,7 @@ async function runJob(jobId: string): Promise<void> {
 function watchdog(jobId: string): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => {
+      stopSignals.add(jobId); // watchdog도 에이전트를 멈춘다 — 기존: status만 바꾸고 에이전트는 계속 실행(이중 소모)
       const job = jobById(jobId);
       if (job && job.status === "running") {
         db.prepare("UPDATE queue_jobs SET status='error', result=?, finished_at=? WHERE id=? AND status='running'").run(`watchdog: ${JOB_TIMEOUT_MS / 60000}분 초과`, now(), jobId);
@@ -121,6 +129,7 @@ async function runJobInner(jobId: string): Promise<void> {
           visited: [botId],
           jobId,
           initiator: job.source === "routine" ? "routine" : "person",
+          isCancelled: () => stopSignals.has(jobId),
         });
         broadcast({ type: "chat.message", conversationId: job.conversation_id, botId, role: "assistant", content: res.text });
       }
@@ -133,29 +142,40 @@ async function runJobInner(jobId: string): Promise<void> {
         visited: [job.bot_id],
         jobId,
         initiator: job.source === "routine" ? "routine" : "person",
+        isCancelled: () => stopSignals.has(jobId),
       });
       broadcast({ type: "chat.message", conversationId: job.conversation_id, botId: job.bot_id, role: "assistant", content: res.text });
     }
-    db.prepare("UPDATE queue_jobs SET status='done', result=?, finished_at=? WHERE id=?").run("", now(), jobId);
-    if (job.source === "routine") db.prepare("UPDATE routines SET failure_count=0 WHERE bot_id=?").run(job.bot_id);
+    if (stopSignals.has(jobId)) {
+      db.prepare("UPDATE queue_jobs SET status='cancelled', result=?, finished_at=? WHERE id=? AND status='running'").run("user stopped", now(), jobId);
+    } else {
+      db.prepare("UPDATE queue_jobs SET status='done', result=?, finished_at=? WHERE id=?").run("", now(), jobId);
+    }
+    if (job.source === "routine" && job.routine_id) {
+      // 실패 카운트는 '발화한 루틴'에 귀속 (기존: bot 단위 조회로 서로 다른 루틴끼리 카운트 오염)
+      db.prepare("UPDATE routines SET failure_count=0 WHERE id=?").run(job.routine_id);
+    }
     void import("./agent/loop.js").then((m) => m.maybeNameConversation(job.conversation_id));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    db.prepare("UPDATE queue_jobs SET status='error', result=?, finished_at=? WHERE id=?").run(msg, now(), jobId);
-    if (job.source === "routine") {
-      db.prepare("UPDATE routines SET failure_count=failure_count+1 WHERE bot_id=?").run(job.bot_id);
-      const f = db.prepare("SELECT failure_count FROM routines WHERE bot_id=? ORDER BY created_at DESC LIMIT 1").get(job.bot_id) as { failure_count: number } | undefined;
-      if (f && f.failure_count >= 10) db.prepare("UPDATE routines SET enabled=0 WHERE bot_id=?").run(job.bot_id);
+    const cancelled = stopSignals.has(jobId);
+    const msg = cancelled ? "사용자가 중단했습니다" : err instanceof Error ? err.message : String(err);
+    db.prepare("UPDATE queue_jobs SET status=?, result=?, finished_at=? WHERE id=? AND status='running'").run(cancelled ? "cancelled" : "error", msg, now(), jobId);
+    if (!cancelled && job.source === "routine" && job.routine_id) {
+      db.prepare("UPDATE routines SET failure_count=failure_count+1 WHERE id=?").run(job.routine_id);
+      const f = db.prepare("SELECT failure_count, enabled FROM routines WHERE id=?").get(job.routine_id) as { failure_count: number; enabled: number } | undefined;
+      if (f && f.failure_count >= 10 && f.enabled) db.prepare("UPDATE routines SET enabled=0 WHERE id=?").run(job.routine_id);
     }
     broadcast({ type: "chat.error", jobId, conversationId: job.conversation_id, error: msg });
   } finally {
     inFlight.delete(job.bot_id);
+    stopSignals.delete(jobId);
     broadcast({ type: "queue.update", job: jobById(jobId) });
     void kickQueue();
   }
 }
 
 export function cancelJob(jobId: string): boolean {
+  stopSignals.add(jobId); // 러닝 잡이면 에이전트가 다음 루프 반복에서 즉시 중단
   const res = db.prepare("UPDATE queue_jobs SET status='cancelled', finished_at=? WHERE id=? AND status='pending'").run(now(), jobId);
   broadcast({ type: "queue.update", job: jobById(jobId) });
   return res.changes > 0;

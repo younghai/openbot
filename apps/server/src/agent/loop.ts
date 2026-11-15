@@ -45,6 +45,8 @@ export interface RunOpts {
   jobId?: string;
   /** 누가 시작했는지 (CK initiator_kind): person | routine | handoff */
   initiator?: "person" | "routine" | "handoff";
+  /** 취소 신호 — true면 다 루프 반복 즉시 중단 (cooperative cancel) */
+  isCancelled?: () => boolean;
 }
 
 const MAX_ITERATIONS = 12;
@@ -214,6 +216,7 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
 
   let overflowRetried = false;
   for (let i = 0; i < MAX_ITERATIONS; i++) {
+    if (opts.isCancelled?.()) throw new Error("__cancelled__: 사용자가 이 작업을 중단했습니다");
     let res;
     try {
       res = await provider.chat({
@@ -314,10 +317,17 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
 
 /** Replace the oldest ~70% of an over-long conversation with a model-generated summary. */
 async function maybeCompact(conversationId: string, provider: import("./providers.js").ModelProvider, aggressive = false): Promise<void> {
-  const rows = db.prepare("SELECT id, role, content, tool_name, tool_result FROM messages WHERE conversation_id=? AND role IN ('user','assistant','tool') ORDER BY created_at").all(conversationId) as { id: string; role: string; content: string; tool_name: string | null; tool_result: string | null }[];
-  const totalChars = rows.reduce((sum, r) => sum + (r.content?.length ?? 0) + (r.role === "tool" ? (r.tool_result?.length ?? 0) : 0), 0);
-  if (!aggressive && totalChars < COMPACT_THRESHOLD_CHARS) return;
-  const cut = Math.floor(rows.length * (aggressive ? 0.5 : 0.7));
+  // 임계 판정은 집계 쿼리로 — 기존: 매턴 모든 메시지 행을 로드해 길이 합산 (대화가 길어질수록 매턴 전체 스캔)
+  const agg = db.prepare(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(length(content) + COALESCE(length(tool_result), 0)), 0) AS chars FROM messages WHERE conversation_id=? AND role IN ('user','assistant','tool')"
+  ).get(conversationId) as { n: number; chars: number };
+  if (agg.n === 0) return;
+  if (!aggressive && agg.chars < COMPACT_THRESHOLD_CHARS) return;
+  const rows = db.prepare("SELECT id, role, content, tool_name, tool_result, meta FROM messages WHERE conversation_id=? AND role IN ('user','assistant','tool') ORDER BY created_at").all(conversationId) as { id: string; role: string; content: string; tool_name: string | null; tool_result: string | null; meta: string | null }[];
+  let cut = Math.max(1, Math.floor(rows.length * (aggressive ? 0.5 : 0.7)));
+  // assistant(tool_calls)↔tool 쌍 절단 금지: 남는 행의 시작이 tool이면 그 쌍 전체를 함께 잘라낸다.
+  // (경계가 쌍 중간이면 다음 턴에서 모델 API가 'tool without preceding tool_calls'로 잡 전체를 거부한다)
+  while (cut < rows.length && rows[cut].role === "tool") cut++;
   const older = rows.slice(0, cut);
   if (older.length === 0) return;
   const transcript = older
@@ -340,9 +350,12 @@ async function maybeCompact(conversationId: string, provider: import("./provider
   const botRow = db.prepare(
     "SELECT bot_id FROM messages WHERE conversation_id=? AND bot_id IS NOT NULL LIMIT 1"
   ).get(conversationId) as { bot_id: string } | undefined;
+  // 배치 삭제 — 기존: 행마다 개별 DELETE(수백 회 run으로 수 초 블록)
   const ids = older.map((r) => r.id);
-  const del = db.prepare("DELETE FROM messages WHERE id=?");
-  for (const id of ids) del.run(id);
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    db.prepare(`DELETE FROM messages WHERE id IN (${chunk.map(() => "?").join(",")})`).run(...chunk);
+  }
   db.prepare("INSERT INTO messages (id, conversation_id, bot_id, role, content, meta, created_at) VALUES (?,?,?,?,?,?,?)").run(
     uid(), conversationId, null, "system", summary, JSON.stringify({ compacted: true }), now()
   );
@@ -353,8 +366,6 @@ async function maybeCompact(conversationId: string, provider: import("./provider
   }
 }
 
-
-/** Auto-title a DM after its first exchange (CopilotKit #997 pattern: a tool-less mini turn). */
 export async function maybeNameConversation(conversationId: string): Promise<void> {
   try {
     const conv = db.prepare("SELECT * FROM conversations WHERE id=?").get(conversationId) as { kind: string; title: string | null; bot_id: string | null } | undefined;

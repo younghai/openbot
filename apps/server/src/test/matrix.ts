@@ -101,11 +101,11 @@ async function approvePending(): Promise<void> {
   }
 }
 
-async function waitJobDone(jobId: string, timeoutMs = 120_000): Promise<"done" | "error" | "timeout"> {
+async function waitJobDone(jobId: string, timeoutMs = 120_000): Promise<"done" | "error" | "cancelled" | "timeout"> {
   const ok = await waitFor(async () => {
     const r = await api(`/api/queue`);
     const job = (r.body as any[]).find((j) => j.id === jobId);
-    return job && (job.status === "done" || job.status === "error");
+    return job && (job.status === "done" || job.status === "error" || job.status === "cancelled");
   }, timeoutMs, `job ${jobId}`);
   if (!ok) return "timeout";
   const r = await api(`/api/queue`);
@@ -249,6 +249,26 @@ let alphaId = "", alphaConv = "";
   }
 
   autoApprove = true;
+}
+
+// 3e. running job cancellation: cancel a RUNNING job → agent stops at next loop iteration → status=cancelled
+{
+  const r = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "StopBot", emoji: "✋" }) });
+  const stConv = r.body.conversationId as string;
+  const p = await api(`/api/conversations/${stConv}/messages`, { method: "POST", body: JSON.stringify({ content: "terminal 로 run 해줘" }) });
+  // running 상태 확인 직후 취소 — 도구 실행은 끝났지만 두 번째 모델 호출 전 루프 반복에서 중단된다
+  let runningSeen = false;
+  for (let i = 0; i < 10 && !runningSeen; i++) {
+    await new Promise((res) => setTimeout(res, 200));
+    const jobs = (await api("/api/queue")).body as any[];
+    runningSeen = jobs.find((j) => j.id === p.body.jobId)?.status === "running";
+  }
+  const cancelled = await api(`/api/queue/${p.body.jobId}/cancel`, { method: "POST" });
+  const final = await waitJobDone(p.body.jobId, 30_000);
+  const jobRow = ((await api("/api/queue")).body as any[]).find((j) => j.id === p.body.jobId);
+  record("running job cancellation (stop actually stops)",
+    runningSeen && cancelled.status === 200 && final === "cancelled" && jobRow?.status === "cancelled",
+    `running=${runningSeen} cancel=${cancelled.status} final=${final} rowStatus=${jobRow?.status}`);
 }
 
 // 4. memory via mock

@@ -66,7 +66,7 @@ browserRouter.post("/triggers/:key", async (c) => {
     try {
       const conv = getOrCreateDmConversation(r.bot_id);
       insertMessage(conv.id, r.bot_id, "user", `[trigger: ${key}] ${r.prompt}`, { meta: { source: "routine", routineId: r.id } });
-      enqueueJob(r.bot_id, conv.id, r.prompt, "routine");
+      enqueueJob(r.bot_id, conv.id, r.prompt, "routine", r.id);
       db.prepare("UPDATE routines SET last_run_at=? WHERE id=?").run(now(), r.id);
       fired++;
     } catch { /* 봇 잠김 등 — 다음 트리거에 재시도 */ }

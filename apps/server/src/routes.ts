@@ -10,6 +10,7 @@ import { tasksRouter } from "./routes/tasks.js";
 import { filesRouter } from "./routes/files.js";
 import { teamsRouter } from "./routes/teams.js";
 import { engagementRouter } from "./routes/engagement.js";
+import { browserRouter } from "./routes/browser.js";
 
 export const api = new Hono();
 api.route("/", botsRouter);
@@ -22,4 +23,5 @@ api.route("/", tasksRouter);
 api.route("/", filesRouter);
 api.route("/", teamsRouter);
 api.route("/", engagementRouter);
+api.route("/", browserRouter);
 api.route("/", platformRouter);

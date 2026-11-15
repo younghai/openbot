@@ -6,11 +6,12 @@
 **A self-hosted bot platform — your own Grok Bot alternative.** 텔레그램·디스코드·슬랙·이메일·전화로 연결되는 AI 팀원을 내 머신에서 운영하세요. API 키 없이 시작하고, Ollama로 완전 로컬로 돌리거나, OpenAI/Anthropic 키를 가져와 쓸 수 있습니다.
 
 - **키 없이 즉시 실행** — 내장 mock 프로바이더로 도구 흐름 시연, Ollama(`qwen2.5`)면 실제 LLM
-- **38개 도구, 전부 승인 게이트** — 읽기는 자동 허용, 부작용(터미널·파일 쓰기·브라우저·결제)은 사람 승인. 감사 로그 전량 기록
+- **45개 도구, 전부 승인 게이트** — 읽기는 자동 허용, 부작용(터미널·파일 쓰기·브라우저·결제)은 사람 승인. 감사 로그 전량 기록
 - **6개 채널 상시 대기** — Telegram(인라인 승인 버튼) · Discord(인터랙션 버튼) · Slack(Block Actions) · Email(SMTP) · 전화·SMS(Twilio) · 결제(Stripe)
 - **보안 5겹** — 명령 가드 → macOS Seatbelt 샌드박스 → 프롬프트 인젝션 가드 → SSRF 가드 → 체크포인트(실행 전 워크스페이스 스냅샷)
 - **학술 리서치 파이프라인** — arXiv·PubMed 키 없는 검색 → 가설→실험→결론 5단계 → Markdown 보고서 + FTS5 지식 색인
 - **제너러티브 UI** — 봇이 차트·표·카드를 렌더링([OpenUI Lang](https://github.com/thesysdev/openui))
+- **컴퓨터유즈 체험** — 🖥️ 라이브 브라우저 패널(WS 스트리밍), 제어권 이관(사람이 CAPTCHA·로그인만 직접 수행→반납), 봇별 브라우저 프로필 영속(로그인 유지), 시크릿 직주입(봇이 값 못 봄)
 
 ## 빠른 시작
 
@@ -51,8 +52,9 @@ pnpm dev          # 서버(tsx watch) + 웹(vite, :5188)
 | 웹·조사 | `search.web`(DDG 키 없음) · `browser.fetch/open/click/type/snapshot`(Playwright) · `arxiv.search` · `pubmed.search` · `research.report` |
 | 지식 | `knowledge.index/search/list`(FTS5 RAG) · `memory.read/write/save` |
 | 커뮤니케이션 | `email.send` · `phone.sms/call` · `payment.send` |
+| 브라우저 조작 | `browser.open/click/type/snapshot/close`(봇별 프로필 영속) · `computer.request_help`(제어권 이관) · `computer.request_secret`(시크릿 직주입) |
 | 데스크톱 | `desktop.list_apps/snapshot/act`(agent-desktop, 접근성 트리 ref 기반) |
-| 메타 | `bot.delegate` · `subagent.run` · `ui.render`(제너러티브 UI) |
+| 메타 | `bot.delegate` · `subagent.run` · `ask_person`(능동 질문) · `routine.create/list/delete`(루틴 자기관리) · `ui.render`(제너러티브 UI) |
 | 동적 | MCP(stdio/HTTP) · OpenAPI · Composio · Pipedream · Treg — 카탈로그에서 원클릭 등록(Context7·DeepWiki 등 키 없는 소스 포함) |
 
 모든 도구는 단일 게이트웨이(`executeTool`) 통과: **정책 → 체크포인트 → 감사 → 실행**. 정책 프리셋 3종(안전/로컬 작업장/잠금)이 38개 전 도구를 일괄 제어.

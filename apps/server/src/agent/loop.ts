@@ -10,6 +10,7 @@ import "../tools/desktop-native.js"; // registers native desktop computer-use (o
 import "../tools/research.js"; // registers arxiv/pubmed search + research report
 import "../tools/genui.js"; // registers generative UI (OpenUI Lang)
 import "../tools/python.js"; // registers stateful python interpreter
+import "../tools/takeover.js"; // registers request_help/secret, ask_person, routine self-management
 import { setDelegationRunner } from "../tools/core.js";
 import { listDynamicTools } from "../tools/dynamic.js";
 import { guardExternal } from "../injection.js";
@@ -42,6 +43,8 @@ export interface RunOpts {
   personaOverride?: string;
   /** tag broadcast events with the originating job */
   jobId?: string;
+  /** 누가 시작했는지 (CK initiator_kind): person | routine | handoff */
+  initiator?: "person" | "routine" | "handoff";
 }
 
 const MAX_ITERATIONS = 12;
@@ -206,7 +209,7 @@ export async function runAgent(opts: RunOpts): Promise<{ text: string; toolCount
 
   const messages: LlmMessage[] = [{ role: "system", content: system }, ...history];
   const tools = toolDefsFor(opts.depth);
-  const ctx: ToolContext = { bot, computer, conversationId: opts.conversationId ?? `ephemeral:${uid()}`, depth: opts.depth, visited: opts.visited };
+  const ctx: ToolContext = { bot, computer, conversationId: opts.conversationId ?? `ephemeral:${uid()}`, depth: opts.depth, visited: opts.visited, initiator: opts.initiator ?? "person" };
   let toolCount = 0;
 
   let overflowRetried = false;
@@ -415,6 +418,7 @@ export function wireDelegation(): void {
       history,
       depth: ctx.depth + 1,
       visited: [...ctx.visited, peer.id],
+      initiator: "handoff",
     });
     broadcast({ type: "chat.message", conversationId: conv.id, botId: peer.id, role: "assistant", content: res.text });
     return res.text || "(peer returned no text)";

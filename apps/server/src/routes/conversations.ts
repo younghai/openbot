@@ -82,9 +82,14 @@ conversationsRouter.post("/conversations/:id/messages", async (c) => {
 conversationsRouter.get("/audit", (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 100), 1000);
   const botId = c.req.query("botId");
-  const rows = botId
-    ? db.prepare("SELECT * FROM audit_log WHERE bot_id=? ORDER BY id DESC LIMIT ?").all(botId, limit)
-    : db.prepare("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?").all(limit);
+  const nobody = c.req.query("nobody") === "1"; // 아무도 안 볼 때 한 일 (routine/handoff) — CK initiator 필터
+  const where: string[] = [];
+  const params: (string | number)[] = [];
+  if (botId) { where.push("bot_id=?"); params.push(botId); }
+  if (nobody) { where.push("initiator != 'person'"); }
+  const sql = `SELECT * FROM audit_log ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT ?`;
+  params.push(limit);
+  const rows = db.prepare(sql).all(...params);
   return c.json(rows);
 });
 

@@ -10,6 +10,7 @@ export function Inbox({ boot }: { boot: Bootstrap }): JSX.Element {
   const [presets, setPresets] = useState<PolicyPreset[]>([]);
   const [currentPreset, setCurrentPreset] = useState<string>("");
   const [allows, setAllows] = useState<{ scope: string; conversation_id: string; bot_id: string; tool: string; created_at: number }[]>([]);
+  const [secretInput, setSecretInput] = useState<Record<string, string>>({});
 
   const load = () => {
     api.approvals().then(setRows).catch((e) => setErr(String(e.message ?? e)));
@@ -69,21 +70,51 @@ export function Inbox({ boot }: { boot: Bootstrap }): JSX.Element {
         </p>
       </div>
       {pending.length === 0 && <div className="card muted">대기 중인 승인 요청이 없습니다.</div>}
-      {pending.map((r) => (
+      {pending.map((r) => {
+        const isHelp = r.tool === "computer.request_help";
+        const isSecret = r.tool === "computer.request_secret";
+        const args = (() => { try { return JSON.parse(r.args ?? "{}") as Record<string, unknown>; } catch { return {}; } })();
+        return (
         <div key={r.id} className="card row approval-card">
-          <div>
-            <strong>{r.tool}</strong> <span className="badge warn">승인 대기</span>
+          <div style={{ flex: 1 }}>
+            <strong>{isHelp ? "🙋 사람 필요" : isSecret ? "🔑 기밀 입력" : r.tool}</strong> <span className="badge warn">승인 대기</span>
             <div className="muted small">{botName(r.bot_id)} · {new Date(r.created_at).toLocaleTimeString()}</div>
-            <pre className="approval-args">{r.args}</pre>
+            {isHelp && <div className="small" style={{ margin: "6px 0" }}>🤖 {String(args.reason ?? "")} {args.url ? <a className="muted" href={String(args.url)} target="_blank" rel="noreferrer">{String(args.url)}</a> : null}</div>}
+            {isHelp && <div className="muted small">승인하면 채팅 화면의 🖥️ 라이브 패널에서 그 단계를 직접 수행하고 <b>반납</b>하세요. 봇이 이어서 진행합니다.</div>}
+            {!isHelp && !isSecret && <pre className="approval-args">{r.args}</pre>}
           </div>
           <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end", gap: 6 }}>
-            <button className="btn primary" onClick={() => decide(r.id, "approve")}>이번만 허용</button>
-            <button className="btn" title="같은 대화·같은 봇·같은 도구는 더 묻지 않음" onClick={() => decide(r.id, "approve", "conversation")}>이 대화에서 허용</button>
-            <button className="btn" title="이 봇의 이 도구는 어디서든 더 묻지 않음 (아래 규칙 목록에 저장)" onClick={() => decide(r.id, "approve", "always")}>이 봇에서 항상</button>
-            <button className="btn danger" onClick={() => decide(r.id, "deny")}>거부</button>
+            {isHelp && <>
+              <button className="btn primary" onClick={() => decide(r.id, "approve")}>🙋 내가 직접 수행</button>
+              <button className="btn danger" onClick={() => decide(r.id, "deny")}>할 수 없음</button>
+            </>}
+            {isSecret && <>
+              <input
+                type="password"
+                placeholder={String(args.label ?? "기밀 값")}
+                autoComplete="off"
+                value={secretInput[r.id] ?? ""}
+                onChange={(e) => setSecretInput((m) => ({ ...m, [r.id]: e.target.value }))}
+                style={{ width: 200 }}
+              />
+              <button className="btn primary" disabled={!secretInput[r.id]} onClick={async () => {
+                const res = await fetch("/api/browser/secret", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ approvalId: r.id, secret: secretInput[r.id] }) });
+                if (!res.ok) setErr("기밀 주입 실패");
+                setSecretInput((m) => { const n = { ...m }; delete n[r.id]; return n; });
+                load();
+              }}>입력·주입</button>
+              <button className="btn danger" onClick={() => decide(r.id, "deny")}>거부</button>
+            </>}
+            {!isHelp && !isSecret && <>
+              <button className="btn primary" onClick={() => decide(r.id, "approve")}>이번만 허용</button>
+              <button className="btn" title="같은 대화·같은 봇·같은 도구는 더 묻지 않음" onClick={() => decide(r.id, "approve", "conversation")}>이 대화에서 허용</button>
+              <button className="btn" title="이 봇의 이 도구는 어디서든 더 묻지 않음 (아래 규칙 목록에 저장)" onClick={() => decide(r.id, "approve", "always")}>이 봇에서 항상</button>
+              <button className="btn danger" onClick={() => decide(r.id, "deny")}>거부</button>
+            </>}
           </div>
         </div>
-      ))}
+        );
+      })}
       {allows.length > 0 && (
         <>
           <h3>저장된 허용 규칙</h3>

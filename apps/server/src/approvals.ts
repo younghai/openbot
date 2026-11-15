@@ -31,6 +31,18 @@ interface Waiter {
 }
 const waiters = new Map<string, Waiter>();
 
+// 시크릿 직주입 페이로드 (CK computer_request_secret 패턴): 승인 카드에 입력된 값은
+// 메모리에서만 살아있고 도구가 소진하면 지운다. 감사 로그에는 글자수만 남는다.
+const secretPayloads = new Map<string, string>();
+export function setApprovalSecret(id: string, value: string): void {
+  secretPayloads.set(id, value);
+}
+export function takeApprovalSecret(id: string): string | undefined {
+  const v = secretPayloads.get(id);
+  secretPayloads.delete(id);
+  return v;
+}
+
 export function policyFor(tool: string): "allow" | "ask" {
   const row = db.prepare("SELECT mode FROM tool_policies WHERE tool=?").get(tool) as { mode: string } | undefined;
   return row?.mode === "allow" ? "allow" : "ask";
@@ -63,6 +75,8 @@ export const POLICY_PRESETS: PolicyPreset[] = [
       "email.send": "ask", "email.status": "allow",
       "phone.sms": "ask", "phone.call": "ask", "phone.status": "allow",
       "payment.send": "ask", "payment.status": "allow",
+      "computer.request_help": "allow", "computer.request_secret": "allow",
+      "ask_person": "allow", "routine.create": "allow", "routine.list": "allow", "routine.delete": "ask",
     },
   },
   {
@@ -78,6 +92,8 @@ export const POLICY_PRESETS: PolicyPreset[] = [
       "email.send": "ask", "email.status": "allow",
       "phone.sms": "ask", "phone.call": "ask", "phone.status": "allow",
       "payment.send": "ask", "payment.status": "allow",
+      "computer.request_help": "allow", "computer.request_secret": "allow",
+      "ask_person": "allow", "routine.create": "allow", "routine.list": "allow", "routine.delete": "ask",
     },
   },
   {
@@ -93,6 +109,8 @@ export const POLICY_PRESETS: PolicyPreset[] = [
       "email.send": "ask", "email.status": "ask",
       "phone.sms": "ask", "phone.call": "ask", "phone.status": "ask",
       "payment.send": "ask", "payment.status": "ask",
+      "computer.request_help": "allow", "computer.request_secret": "allow",
+      "ask_person": "allow", "routine.create": "allow", "routine.list": "allow", "routine.delete": "ask",
     },
   },
 ];
@@ -193,6 +211,15 @@ export async function requestApproval(
   tool: string,
   args: Record<string, unknown>
 ): Promise<ApprovalVerdict> {
+  return (await requestApprovalDetailed(ctx, tool, args)).verdict;
+}
+
+/** 승인 행 id까지 필요한 도구용 (시크릿 직주입이 카드 id로 페이로드를 회수한다). */
+export async function requestApprovalDetailed(
+  ctx: { bot: { id: string }; conversationId: string | null },
+  tool: string,
+  args: Record<string, unknown>
+): Promise<{ verdict: ApprovalVerdict; id: string }> {
   const id = uid();
   db.prepare(
     "INSERT INTO approvals (id, bot_id, conversation_id, tool, args, status, created_at) VALUES (?,?,?,?,?,'pending',?)"
@@ -208,7 +235,7 @@ export async function requestApproval(
     }, APPROVAL_TIMEOUT_MS);
     waiters.set(id, { resolve, timer });
   });
-  return verdict;
+  return { verdict, id };
 }
 
 /** No waiter survives a restart: undecided requests become denials-equivalent (expired). */

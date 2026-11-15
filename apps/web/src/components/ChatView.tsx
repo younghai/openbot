@@ -4,6 +4,7 @@ import { subscribe } from "../ws";
 import type { Approval, Bootstrap, Message } from "../types";
 import { MemoryPanel } from "./MemoryPanel";
 import { GenUICard, type UiActionEvent } from "./GenUICard";
+import { LiveBrowserPanel } from "./LiveBrowserPanel";
 import { EditBotModal } from "./EditBotModal";
 
 /* --- minimal Web Speech typings (not in TS DOM lib) --- */
@@ -57,6 +58,7 @@ export function ChatView({
   const [listening, setListening] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [skillNote, setSkillNote] = useState("");
+  const [liveScreen, setLiveScreen] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<Approval | null>(null);
   const [thinkingChars, setThinkingChars] = useState(0);
@@ -328,6 +330,7 @@ export function ChatView({
           )}
           {skillNote && <span className="muted small">{skillNote}</span>}
           {bot && <button className={`icon-btn ${speakOn ? "on" : ""}`} title="응답 읽어주기" onClick={() => setSpeakOn(!speakOn)}>🔊</button>}
+          {bot && <button className={`icon-btn ${liveScreen ? "on" : ""}`} title="라이브 브라우저 — 봇 화면 보기·제어권 이관" onClick={() => setLiveScreen(!liveScreen)}>🖥️</button>}
           {bot && <button className={`icon-btn call ${callMode ? "on" : ""}`} title="통화" onClick={toggleCall}>📞</button>}
           {bot && <button className={`icon-btn ${showMemory ? "on" : ""}`} title="메모리" onClick={() => setShowMemory(!showMemory)}>🧠</button>}
           {bot && <button className="icon-btn" title="봇 편집" onClick={() => setShowEdit(true)}>✏️</button>}
@@ -385,6 +388,14 @@ export function ChatView({
           <div ref={bottomRef} />
         </div>
         {showMemory && bot && <MemoryPanel botId={bot.id} />}
+        {liveScreen && bot && (
+          <LiveBrowserPanel
+            computerId={bot.computer_id ?? boot.computers[0]?.id ?? ""}
+            botId={bot.id}
+            botName={bot.name}
+            onClose={() => setLiveScreen(false)}
+          />
+        )}
       </div>
 
       <footer className="chat-input">

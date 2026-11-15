@@ -112,6 +112,48 @@ export function startFixtures(): Promise<{ server: http.Server; port: number; ca
             tool_calls: [{ id: id(), type: "function", function: { name: "browser.open", arguments: JSON.stringify({ url: "https://example.com" }) } }],
           });
         }
+        if (text.includes("profilepage")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "browser.open", arguments: JSON.stringify({ url: process.env.OPENBOT_PROFILE_TEST_URL || "http://127.0.0.1:1/profile-test" }) } }],
+          });
+        }
+        if (text.includes("closepage")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "browser.close", arguments: "{}" } }],
+          });
+        }
+        if (text.includes("requesthelp")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "computer.request_help", arguments: JSON.stringify({ reason: "GitHub 로그인이 필요합니다" }) } }],
+          });
+        }
+        if (text.includes("requestsecret")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "computer.request_secret", arguments: JSON.stringify({ selector: "input[name=pw]", label: "테스트 비밀번호" }) } }],
+          });
+        }
+        if (text.includes("askperson")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "ask_person", arguments: JSON.stringify({ question: "어느 형식으로 보고할까요?", options: "표, 차트, 텍스트" }) } }],
+          });
+        }
+        if (text.includes("routinecreate")) {
+          return respond({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: id(), type: "function", function: { name: "routine.create", arguments: JSON.stringify({ cron: "0 9 * * 1-5", prompt: "profilepage 아침 브리핑", name: "아침 브리핑", trigger_key: "matrixtrig" }) } }],
+          });
+        }
         if (text.includes("skilldemo")) {
           return respond({
             role: "assistant",
@@ -145,6 +187,15 @@ export function startFixtures(): Promise<{ server: http.Server; port: number; ca
         return respond({ role: "assistant", content: `fixture-reply: ${text.slice(0, 60)}` });
       }
 
+      if (url === "/profile-test") {
+        const html = `<!doctype html><html><body><script>
+const v = localStorage.getItem('obprofile') || 'none';
+localStorage.setItem('obprofile', 'persisted-ok');
+document.body.innerText = 'PROFILE:' + v + ' | ';
+</script><input name="pw" type="password" placeholder="pw"><span id="pwlen"></span></body></html>`;
+        res.setHeader("content-type", "text/html");
+        return res.end(html);
+      }
       if (url === "/openapi.json" && req.method === "GET") {
         return json(res, 200, {
           openapi: "3.0.0",

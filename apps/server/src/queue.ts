@@ -120,6 +120,7 @@ async function runJobInner(jobId: string): Promise<void> {
           depth: 0,
           visited: [botId],
           jobId,
+          initiator: job.source === "routine" ? "routine" : "person",
         });
         broadcast({ type: "chat.message", conversationId: job.conversation_id, botId, role: "assistant", content: res.text });
       }
@@ -131,6 +132,7 @@ async function runJobInner(jobId: string): Promise<void> {
         depth: 0,
         visited: [job.bot_id],
         jobId,
+        initiator: job.source === "routine" ? "routine" : "person",
       });
       broadcast({ type: "chat.message", conversationId: job.conversation_id, botId: job.bot_id, role: "assistant", content: res.text });
     }

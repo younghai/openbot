@@ -225,7 +225,7 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-si
   padding: 8px; color: var(--danger); font-weight: 600;
 }
 
-.chat-body { flex: 1; display: flex; min-height: 0; }
+.chat-body { flex: 1; display: flex; min-height: 0; position: relative; }
 .messages { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
 .empty-chat { text-align: center; margin-top: 12vh; line-height: 2; }
 
@@ -491,3 +491,8 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-si
 @media (max-width: 420px) {
   .grid3 { grid-template-columns: 1fr 1fr; gap: 6px; }
 }
+
+/* live browser panel (CK computer panel 패턴) */
+.live-browser-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin: 8px 0; overflow: hidden; }
+.live-browser-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 420px; max-width: 60%; z-index: 5; display: flex; flex-direction: column; box-shadow: -8px 0 24px rgba(0,0,0,0.4); }
+.live-browser-panel img { max-height: calc(100% - 40px); object-fit: contain; }

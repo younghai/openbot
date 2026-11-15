@@ -363,6 +363,19 @@ class MockProvider implements ModelProvider {
     if (/\bterminal\b|\brun\b|명령|커맨드|셸|shell/.test(text)) {
       push("terminal.exec", { command: "pwd && echo hello from mock bot && date" });
     }
+    if (/profilepage/.test(text)) {
+      push("browser.open", { url: process.env.OPENBOT_PROFILE_TEST_URL || "http://127.0.0.1:1/profile-test" });
+    } else if (/closepage/.test(text)) {
+      push("browser.close", {});
+    } else if (/requesthelp/.test(text)) {
+      push("computer.request_help", { reason: "GitHub 로그인이 필요합니다" });
+    } else if (/requestsecret/.test(text)) {
+      push("computer.request_secret", { selector: "input[name=pw]", label: "테스트 비밀번호" });
+    } else if (/askperson/.test(text)) {
+      push("ask_person", { question: "어느 형식으로 보고할까요?", options: "표, 차트, 텍스트" });
+    } else if (/routinecreate/.test(text)) {
+      push("routine.create", { cron: "0 9 * * 1-5", prompt: "profilepage 아침 브리핑", name: "아침 브리핑", trigger_key: "matrixtrig" });
+    }
     if (/pycode/.test(text)) {
       push("python.exec", { code: 'x = 21\nprint("hello", x * 2)' });
     } else if (/pykeep/.test(text)) {

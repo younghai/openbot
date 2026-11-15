@@ -20,6 +20,7 @@ const results: { name: string; pass: boolean; evidence: string }[] = [];
 let server: ChildProcess | null = null;
 let dataDir = "";
 const fixture = await startFixtures();
+process.env.OPENBOT_PROFILE_TEST_URL = `http://127.0.0.1:${fixture.port}/profile-test`;
 
 function record(name: string, pass: boolean, evidence: string): void {
   results.push({ name, pass, evidence });
@@ -45,7 +46,7 @@ async function startServer(): Promise<void> {
   const tsxBin = path.resolve(here, "../../node_modules/.bin/tsx");
   server = spawn(tsxBin, [path.join(here, "..", "index.ts")], {
     cwd: here,
-    env: { ...process.env, OPENBOT_PORT: String(PORT), OPENBOT_HOST: "127.0.0.1", OPENBOT_DATA_DIR: dataDir, TELEGRAM_API_BASE: `http://127.0.0.1:${fixture.port}/tg`, OPENBOT_ARXIV_API_BASE: `http://127.0.0.1:${fixture.port}/arxiv/api/query`, OPENBOT_PUBMED_API_BASE: `http://127.0.0.1:${fixture.port}/pubmed/entrez/eutils` },
+    env: { ...process.env, OPENBOT_PORT: String(PORT), OPENBOT_HOST: "127.0.0.1", OPENBOT_DATA_DIR: dataDir, TELEGRAM_API_BASE: `http://127.0.0.1:${fixture.port}/tg`, OPENBOT_ARXIV_API_BASE: `http://127.0.0.1:${fixture.port}/arxiv/api/query`, OPENBOT_PUBMED_API_BASE: `http://127.0.0.1:${fixture.port}/pubmed/entrez/eutils`, OPENBOT_PROFILE_TEST_URL: `http://127.0.0.1:${fixture.port}/profile-test`, OPENBOT_SSRF_ALLOW_HOSTS: `127.0.0.1:${fixture.port}/profile-test` },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
@@ -962,6 +963,121 @@ let fixProviderId = "";
   record("routine mode+goal stored (check-in / until)",
     r.status === 201 && row?.mode === "report" && row?.goal === "릴리스 노트 초안 승인",
     `create=${r.status} mode=${row?.mode} goal="${row?.goal}"`);
+}
+
+// 34. computer use: 브라우저 프로필 영속 + 제어권 이관 + 시크릿 직주입 + 라이브 프레임 (optional playwright)
+{
+  let hasPlaywright = true;
+  try { await import("playwright"); } catch { hasPlaywright = false; }
+  if (!hasPlaywright) {
+    record("computer use: profile persistence + takeover + secret (optional playwright)", true, "skipped — playwright not installed");
+  } else {
+    const b = await api("/api/bots", { method: "POST", body: JSON.stringify({ name: "UseBot", emoji: "🖱", providerId: fixProviderId }) });
+    if (!b.body?.id || !b.body?.conversationId) {
+      record("computer use suite", false, `bot create failed: ${JSON.stringify(b.body).slice(0, 120)}`);
+    } else {
+    const uConv = b.body.conversationId as string;
+
+    // 🅒 세션 영속: 열기 → 닫기 → 다시 열기 → localStorage 유지
+    const s1 = await send(uConv, "profilepage 열어줘");
+    if (s1.status !== "done") { /* fallthrough: 결과 검사에서 판정 */ }
+    const open1 = [...(await messagesOf(uConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "browser.open");
+    const r1 = open1 ? JSON.parse(open1.tool_result ?? "{}") : {};
+    if (!r1.text) record("computer use: first visit", false, `browser.open result=${JSON.stringify(r1).slice(0, 160)}`);
+    const visit1 = String(r1.text ?? "");
+    const sC = await send(uConv, "closepage 닫아줘");
+    void sC.status;
+    const s2 = await send(uConv, "profilepage 다시 열어줘");
+    void s2.status;
+    const open2 = [...(await messagesOf(uConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "browser.open");
+    const r2 = open2 ? JSON.parse(open2.tool_result ?? "{}") : {};
+    const visit2 = String(r2.text ?? "");
+    const persisted = visit1.includes("PROFILE:none") && visit2.includes("PROFILE:persisted-ok");
+    record("computer use: 브라우저 프로필 영속(userDataDir)", persisted,
+      `visit1="${visit1.slice(0, 24)}" visit2="${visit2.slice(0, 28)}"`);
+
+    const computerId = (b.body as any).computerId ?? ((await api("/api/bootstrap")).body as any).bots.find((x: any) => x.id === (b.body as any).id)?.computer_id;
+
+    // 🅑 제어권 이관: request_help → 승인 전 act 차단 → 승인 → act 허용 → 반납 → done_by_person
+    autoApprove = false; // 승인 카드를 직접 제어 (자동 승인과 경합 방지)
+    const pHelpRaw = await api(`/api/conversations/${uConv}/messages`, { method: "POST", body: JSON.stringify({ content: "requesthelp 실행해줘" }) });
+    const pHelp = { jobId: (pHelpRaw.body as any).jobId };
+    await waitFor(async () => {
+      const a = await api("/api/approvals?status=pending");
+      return Array.isArray(a.body) && a.body.some((x: any) => x.tool === "computer.request_help");
+    }, 15_000, "help approval appears");
+    const helpRow = ((await api("/api/approvals?status=pending")).body as any[]).find((x) => x.tool === "computer.request_help");
+    const actBlocked = await api("/api/browser/act", { method: "POST", body: JSON.stringify({ computerId, botId: b.body.id, action: { kind: "click", x: 10, y: 10 } }) });
+    const ap = await api(`/api/approvals/${helpRow.id}/approve`, { method: "POST" });
+    // 승인 → 도구 재개 → takeover 등록 사이의 경쟁: act가 통과할 때까지 짧게 폴링
+    let actOk = { status: 0 };
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 700));
+      actOk = await api("/api/browser/act", { method: "POST", body: JSON.stringify({ computerId, botId: b.body.id, action: { kind: "click", x: 10, y: 10 } }) });
+      if (actOk.status === 200) break;
+    }
+    const rel = await api("/api/browser/release", { method: "POST", body: JSON.stringify({ computerId, botId: b.body.id }) });
+    const dHelp = await waitJobDone((pHelp as { jobId?: string }).jobId ?? "", 30_000);
+    const helpTool = [...(await messagesOf(uConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "computer.request_help");
+    const helpRes = helpTool ? JSON.parse(helpTool.tool_result) : null;
+    record("computer use: 제어권 이관(request_help→act→반납)",
+      ap.status === 200 && actBlocked.status === 409 && actOk.status === 200 && rel.status === 200 && dHelp === "done" && helpRes?.done_by_person === true,
+      `blocked=${actBlocked.status} act=${actOk.status} rel=${rel.status} job=${dHelp} byPerson=${helpRes?.done_by_person}`);
+
+    // 🔑 시크릿 직주입: 응답·감사에 미노출
+    autoApprove = false;
+    const pSecRaw = await api(`/api/conversations/${uConv}/messages`, { method: "POST", body: JSON.stringify({ content: "requestsecret 실행해줘" }) });
+    const pSec = { jobId: (pSecRaw.body as any).jobId };
+    await waitFor(async () => {
+      const a = await api("/api/approvals?status=pending");
+      return Array.isArray(a.body) && a.body.some((x: any) => x.tool === "computer.request_secret");
+    }, 15_000, "secret approval appears");
+    const secRow = ((await api("/api/approvals?status=pending")).body as any[]).find((x) => x.tool === "computer.request_secret");
+    const secRes = await api("/api/browser/secret", { method: "POST", body: JSON.stringify({ approvalId: secRow.id, secret: "sk-test-123" }) });
+    const dSec = await waitJobDone((pSec as { jobId?: string }).jobId ?? "", 30_000);
+    const secTool = [...(await messagesOf(uConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "computer.request_secret");
+    const secResult = secTool ? JSON.parse(secTool.tool_result) : null;
+    const auditRows = await api("/api/audit?limit=30");
+    const leaked = JSON.stringify(auditRows.body).includes("sk-test-123") || JSON.stringify(secResult).includes("sk-test-123");
+    record("computer use: 시크릿 직주입(마스크, 봇 미노출)",
+      secRes.status === 200 && dSec === "done" && secResult?.filled === true && !leaked,
+      `secret=${secRes.status} job=${dSec} filled=${secResult?.filled} leaked=${leaked}`);
+
+    autoApprove = true;
+    // 🅐 라이브 프레임: watch → browser.frame 수신
+    const WebSocket2 = (await import("ws")).default;
+    let gotFrame = false;
+    const wsClient = new WebSocket2(`ws://127.0.0.1:${PORT}/ws`);
+    wsClient.on("open", () => wsClient.send(JSON.stringify({ type: "browser.watch", botId: b.body.id })));
+    wsClient.on("message", (d: Buffer) => { if (String(d).includes("browser.frame") && String(d).includes("data:image/jpeg")) gotFrame = true; });
+    await new Promise((r) => setTimeout(r, 3500));
+    wsClient.close();
+    record("computer use: 라이브 화면 스트리밍(WS jpeg)", gotFrame, `frames received=${gotFrame}`);
+
+    // 🅔 ask_person + 🅗 routine.create + 트리거 + initiator 감사
+    const pAsk = await api(`/api/conversations/${uConv}/messages`, { method: "POST", body: JSON.stringify({ content: "askperson 실행해줘" }) });
+    await waitJobDone((pAsk.body as any).jobId, 30_000);
+    const notifs = await api("/api/notifications");
+    const askNotif = (notifs.body as any[]).find((n) => n.kind === "ask_person");
+    const pRc = await api(`/api/conversations/${uConv}/messages`, { method: "POST", body: JSON.stringify({ content: "routinecreate 등록해줘" }) });
+    await waitJobDone((pRc.body as any).jobId, 30_000);
+    const rcTool = [...(await messagesOf(uConv))].reverse().find((m) => m.role === "tool" && m.tool_name === "routine.create");
+    const rcRes = rcTool ? JSON.parse(rcTool.tool_result) : null;
+    const trig = await api("/api/triggers/matrixtrig", { method: "POST" });
+    let routineAudit: any = undefined;
+    let debugRows: any[] = [];
+    for (let i = 0; i < 12 && !routineAudit; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      await approvePending(); // 트리거 잡의 browser.open이 ask 정책 — 승인해 줘야 실행된다
+      const auditNobody = await api("/api/audit?nobody=1&limit=50");
+      routineAudit = (auditNobody.body as any[]).find((a) => a.initiator === "routine" && a.bot_id === b.body.id);
+      debugRows = auditNobody.body as any[];
+    }
+    record("능동 질문·루틴 쓰기·이벤트 트리거·initiator 감사",
+      Boolean(askNotif) && rcRes?.created === true && trig.status === 200 && (trig.body as any).fired >= 1 && Boolean(routineAudit),
+      `askNotif=${Boolean(askNotif)} routine=${rcRes?.created} fired=${(trig.body as any)?.fired} initiatorAudit=${Boolean(routineAudit)} nobodyRows=${debugRows.length} sample=${JSON.stringify(debugRows.slice(0, 2)).slice(0, 160)}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------- teardown + report

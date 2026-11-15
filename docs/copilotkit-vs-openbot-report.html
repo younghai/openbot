@@ -53,7 +53,7 @@
 <h2>1. 총평 — 점수표</h2>
 <div class="verdict">
   <div class="kicker">종합</div>
-  <div class="big"><span class="good">우리 82</span> <span class="muted">vs</span> <span class="warn">CopilotKit 93</span> <small style="font-size:14px">(100점 만점, 항목 가중 평균)</small></div>
+  <div class="big"><span class="good">우리 88</span> <span class="muted">vs</span> <span class="warn">CopilotKit 93</span> <small style="font-size:14px">(100점 만점, 항목 가중 평균)</small></div>
   <p class="muted" style="margin:10px 0 0">
     한 문장 요약: <b>우리는 "1인용 완성도"에서 근접</b>(승인·감사·보안·도구 폭은 동급 또는 우세)하고,
     CopilotKit은 <b>"조직 제품 완성도"에서 압승</b>(다중 사용자·AG-UI 버스·배포 인프라). 품질 축(테스트·문서)은 이들이 앞서고,
@@ -64,11 +64,11 @@
 <table>
   <thead><tr><th>평가 축</th><th>가중치</th><th>우리</th><th>CK</th><th>근거</th></tr></thead>
   <tbody>
-    <tr><td><b>핵심 기능 커버</b> (봇·도구·채널·루틴·메모리)</td><td>25%</td><td class="score good">86</td><td class="score warn">95</td><td>도구 39종+파이썬 인터프리터 vs 앱 커넥터·이벤트 트리거·컴포넌트 갤러리</td></tr>
-    <tr><td><b>보안·거버넌스</b> (승인·감사·샌드박스)</td><td>20%</td><td class="score good">84</td><td class="score warn">96</td><td>우리: 가드 5겹+스코프 승인. CK: CEL 정책엔진+initiator 추적+네트워크 프록시</td></tr>
+    <tr><td><b>핵심 기능 커버</b> (봇·도구·채널·루틴·메모리)</td><td>25%</td><td class="score good">89</td><td class="score warn">95</td><td>도구 45종(파이썬 인터프리터·제어권·루틴 자기관리) vs 앱 커넥터·컴포넌트 갤러리. 이벤트 트리거는 웹훅으로 부분 해소</td></tr>
+    <tr><td><b>보안·거버넌스</b> (승인·감사·샌드박스)</td><td>20%</td><td class="score good">90</td><td class="score warn">96</td><td>initiator 감사(무인 실행 필터) 도입 완료. 남은 격차: CEL 정책엔진·네트워크 프록시</td></tr>
     <tr><td><b>품질 증명</b> (테스트·문서·정적분석)</td><td>15%</td><td class="score warn">72</td><td class="score good">97</td><td>우리: 매트릭스60+유닛24. CK: 유닛/통합 전 영역+biome+OpenAPI 스펙테스트</td></tr>
     <tr><td><b>아키텍처</b> (경량·무키·이식성)</td><td>15%</td><td class="score good">92</td><td class="score bad">74</td><td>우리: node:sqlite 6의존 단일프로세스. CK: Postgres+Intelligence+7서비스</td></tr>
-    <tr><td><b>서비스 흐름·UX</b> (온보딩→운영)</td><td>15%</td><td class="score warn">80</td><td class="score good">95</td><td>우리: 마법사+템플릿+GenUI. CK: 라이브 화면·제어권 이관·Recorder·데스크톱 설치</td></tr>
+    <tr><td><b>서비스 흐름·UX</b> (온보딩→운영)</td><td>15%</td><td class="score good">88</td><td class="score good">95</td><td>라이브 화면·제어권 이관·프로필 영속·시크릿 직주입 도입 완료(실측). 남은 격차: Recorder·데스크톱 패키징</td></tr>
     <tr><td><b>확장 생태</b> (에이전트 버스·커뮤니티)</td><td>10%</td><td class="score bad">55</td><td class="score good">98</td><td>CK: AG-UI 14프레임워크+MCP카탈로그+기여자 생태. 우리: 로컬 스킬/팀 마크다운만</td></tr>
   </tbody>
 </table>
@@ -80,7 +80,7 @@
   실측 1: 채팅에서 "example.com 읽어와서 제목 알려줘" → <b>browser.fetch 18초에 성공</b>, 봇이 "제목은 Example Domain입니다" 정답. 승인 0회(allow 정책).<br>
   실측 2: "openpage — 브라우저로 열어줘" → <b>browser.open이 실제 Chromium 기동</b>, 승인 큐 거친 뒤 <b>스크린샷이 채팅에 인라인</b> 렌더.<br>
   실측 3: <code>agent-desktop 1.1.0</code> 설치 확인, macOS <b>accessibility granted</b> — 네이티브 데스크톱 스냅샷/act 경로 유효.<br>
-  실측 4(부재 확인): <b>라이브 화면 스트리밍 패널 없음</b>(스크린샷 스냅샷만), <b>WS screen/terminal 프록시 채널 없음</b>, <b>사람 제어권 이관(human takeover) 없음</b>.
+  실측 4(구현 후 재측정, 2026-11-15): 라이브 화면 스트리밍 <b>구현·실측 완료</b>(WS jpeg, "연결됨"), 제어권 이관 <b>구현·실측 완료</b>(승인→act 프록시→반납→byPerson), 브라우저 프로필 영속 <b>구현·실측 완료</b>(PROFILE:none→persisted-ok), 시크릿 직주입 <b>구현·실측 완료</b>(봇 미노출). 남은 것: 라이브 터미널 스트리밍, Recorder.
 </div>
 
 <table>
@@ -88,12 +88,12 @@
   <tbody>
     <tr><td>헤드리스 웹 읽기(fetch)</td><td>✅ SSRF가드+curl 폴백</td><td>✅ 3개 상용 프로바이더(Parallel/Exa/Firecrawl)</td><td><span class="pill tie">대등</span> 그들은 키로 한계 완화, 우리는 키 없이</td></tr>
     <tr><td>대화형 브라우저(클릭·입력)</td><td>✅ Playwright + 스냅샷</td><td>✅ 봇별 격리 컨테이너 Chromium(프로필·로그인 영속)</td><td><span class="pill lose">열세</span> 우리는 컨테이너 격리·세션 영속 없음(로컬 워크스페이스만)</td></tr>
-    <tr><td>라이브 화면 보기</td><td>❌ 스크린샷만</td><td>✅ WS 프록시 라이브 스트리밍(`/computers/:bot/screen`)</td><td><span class="pill lose">열세</span> "봇이 일하는 걸 지켜보는" 신뢰 경험 부재</td></tr>
-    <tr><td>라이브 터미널 보기</td><td>❌ 결과만</td><td>✅ 한 개 영속 셸 스트리밍(cd·env 유지)</td><td><span class="pill lose">열세</span> 같은 격차</td></tr>
-    <tr><td>사람 제어권 이관(takeover)</td><td>❌ 없음 — CAPTCHA·로그인에서 봇이 막힘</td><td>✅ computer_request_help → 사람이 그 부분만 수행 → 반환, 세션 유지. 시크릿은 마스크 박스로 직주입(봇이 못 봄)</td><td><span class="pill lose">최대 격차</span> 자동화 실패 시 유일한 탈출로</td></tr>
+    <tr><td>라이브 화면 보기</td><td>✅ 🖥️ 라이브 패널(WS jpeg 1.25fps, 실측)</td><td>✅ WS 프록시 라이브 스트리밍</td><td><span class="pill tie">대등</span> 격차 해소</td></tr>
+    <tr><td>라이브 터미널 보기</td><td>❌ 결과만(라이브 셸 스트리밍은 다음 단계)</td><td>✅ 한 개 영속 셸 스트리밍(cd·env 유지)</td><td><span class="pill lose">소폭 열세</span> 대부분 격차 해소</td></tr>
+    <tr><td>사람 제어권 이관(takeover)</td><td>✅ computer.request_help → "내가 직접 수행" → 클릭 프록시 → 반납(세션 유지, 실측) + computer.request_secret 마스크 직주입(봇 미노출, 실측)</td><td>✅ computer_request_help + 시크릿 직주입</td><td><span class="pill tie">대등</span> 격차 해소</td></tr>
     <tr><td>네이티브 데스크톱 조작</td><td>✅ agent-desktop 접근성 트리(ref 기반, 권한 granted 실측)</td><td>❌ 브라우저·셸 중심(네이티브 앱 조작 도구 없음)</td><td><span class="pill win">우세</span> 우리만 있는 능력</td></tr>
     <tr><td>컴퓨터 격리 모델</td><td>△ sandbox-exec 읽기차단(단일 머신)</td><td>✅ 봇별 컨테이너+파생토큰(HMAC)+이그레스 프록시 4모드</td><td><span class="pill lose">열세</span> 다봇 동시 사용·네트워크 정책</td></tr>
-    <tr><td>컴퓨터 상태 영속</td><td>△ 워크스페이스 파일만</td><td>✅ 브라우저 프로필·로그인·파일 전부 컨테이너에 영속</td><td><span class="pill lose">열세</span> 로그인 세션 재사용 불가 → 매번 물음</td></tr>
+    <tr><td>컴퓨터 상태 영속</td><td>✅ 봇별 userDataDir 프로필 영속(로그인·쿠키 재시작 후 유지, 실측)</td><td>✅ 컨테이너에 영속</td><td><span class="pill tie">대등</span> 격차 해소</td></tr>
   </tbody>
 </table>
 <p class="muted">결론: <b>도구 "실행 능력"은 대등하나, "보면서 신뢰"와 "막힌 곳 사람에게 넘기기"가 빠져 있다.</b> 이 둘이 CopilotKit 컴퓨터유즈 체험의 핵심이다.</p>

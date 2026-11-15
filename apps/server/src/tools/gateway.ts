@@ -10,6 +10,8 @@ export interface ToolContext {
   depth: number;
   /** bot ids already in the delegation chain (cycle guard) */
   visited: string[];
+  /** 누가 이 실행을 시작했는지 (CK initiator_kind): person | routine | handoff */
+  initiator?: "person" | "routine" | "handoff";
 }
 
 export interface ToolSpec {
@@ -55,8 +57,8 @@ export function audit(
   detail: string
 ): void {
   db.prepare(
-    "INSERT INTO audit_log (bot_id, conversation_id, tool, args, decision, detail, created_at) VALUES (?,?,?,?,?,?,?)"
-  ).run(ctx?.bot.id ?? null, ctx?.conversationId ?? null, tool, JSON.stringify(args).slice(0, 2000), decision, detail.slice(0, 2000), now());
+    "INSERT INTO audit_log (bot_id, conversation_id, tool, args, decision, detail, created_at, initiator) VALUES (?,?,?,?,?,?,?,?)"
+  ).run(ctx?.bot.id ?? null, ctx?.conversationId ?? null, tool, JSON.stringify(args).slice(0, 2000), decision, detail.slice(0, 2000), now(), ctx?.initiator ?? "person");
 }
 
 /** Resolve a relative/absolute path against the computer workspace, denying escapes. */
@@ -92,7 +94,19 @@ export function assertPublicHttpUrl(raw: string): URL {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new ToolDenial(`only http(s) URLs are allowed, got ${url.protocol}`);
   }
-  if (PRIVATE_HOST_PATTERNS.some((re) => re.test(url.hostname))) {
+  // 명시적 허용 목록 (OPENBOT_SSRF_ALLOW_HOSTS) — 로컬 픽스처·사내 프록시 같은 의도적 탈출구.
+  // 항목 형식: host | host:port | host:port/path-prefix (정확한 host[:port]와 path 접두가 모두 일치해야 통과).
+  // 미설정 시 기존 동작 그대로(전면 차단) — 감사·SSRF 정책 테스트가 이 차단에 의존한다.
+  const allowEntries = (process.env.OPENBOT_SSRF_ALLOW_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+  const allowed = allowEntries.some((entry) => {
+    const [hostPort, pathPrefix] = entry.split("/");
+    const [h, p] = hostPort.split(":");
+    if (url.hostname !== h) return false;
+    if (p && url.port !== p) return false;
+    if (pathPrefix && !url.pathname.startsWith("/" + pathPrefix)) return false;
+    return true;
+  });
+  if (PRIVATE_HOST_PATTERNS.some((re) => re.test(url.hostname)) && !allowed) {
     throw new ToolDenial(`target host '${url.hostname}' is a private/loopback address and is blocked`);
   }
   return url;
@@ -198,8 +212,8 @@ function insertAudit(
   detail: string
 ): number {
   db.prepare(
-    "INSERT INTO audit_log (bot_id, conversation_id, tool, args, decision, detail, created_at) VALUES (?,?,?,?,?,?,?)"
-  ).run(ctx?.bot.id ?? null, ctx?.conversationId ?? null, tool, JSON.stringify(args).slice(0, 2000), decision, detail.slice(0, 2000), now());
+    "INSERT INTO audit_log (bot_id, conversation_id, tool, args, decision, detail, created_at, initiator) VALUES (?,?,?,?,?,?,?,?)"
+  ).run(ctx?.bot.id ?? null, ctx?.conversationId ?? null, tool, JSON.stringify(args).slice(0, 2000), decision, detail.slice(0, 2000), now(), ctx?.initiator ?? "person");
   const row = db.prepare("SELECT last_insert_rowid() AS id").get() as { id: number };
   return row.id;
 }
